@@ -81,6 +81,25 @@ module Decidim
           client.get("/processes/#{process_id}/validation")
         end
 
+        # Deletes a draft — `DELETE /processes/{id}`.
+        #
+        # Only unpublished drafts can be deleted; a published process lives on
+        # chain and the API rejects the call with `40012` ("process already
+        # published and not in draft mode"). Auth: the caller must be
+        # manager/admin of the process's org, which an API key satisfies via
+        # its creating user when scoped `voting:write` (see saas-backend
+        # commit 4517731, allowlist entry `"DELETE " + processEndpoint`).
+        #
+        # Useful to unstick the per-org draft cap (`40031 max drafts
+        # reached`) without human intervention.
+        #
+        # @param process_id [String] SaaS process id.
+        # @return [Hash]
+        # @raise [Decidim::Elections::Vocdoni::ApiError]
+        def delete(process_id)
+          client.delete("/processes/#{process_id}")
+        end
+
         # Publishes a draft on chain — `POST /processes/{id}/publish`.
         #
         # Asynchronous: the answer is `{"jobId" => "…"}`, to be polled with
