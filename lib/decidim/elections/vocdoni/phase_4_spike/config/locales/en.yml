@@ -17,20 +17,17 @@ en:
           weighted_votes_help: "Assign each voter a weight (default 1). Requires a per-voter weight column when the census is populated."
       admin:
         elections:
-          form:
-            results_availability:
-              blockchain_backed: "Blockchain-backed"
-              blockchain_backed_help: "Results are anchored on the Vocdoni chain and revealed after the election ends."
-        dashboard:
-          status:
-            results_availability:
-              blockchain_backed: "Results anchored on the Vocdoni chain"
-          results:
-            results_availability:
-              blockchain_backed: "Results are anchored on the Vocdoni chain and revealed after the election ends."
-        voting:
-          results_availability:
-            blockchain_backed: "Results anchored on the Vocdoni chain."
+          dashboard:
+            # Overrides the misleading upstream copy ("Edits can still be made
+            # before publishing. Once published, you'll still be able to update
+            # the description of the election.") for Vocdoni-backed elections,
+            # where publish is irreversible and locks every editable field.
+            vocdoni_subtitle_html: >
+              <strong>This is the last step before writing the election to the blockchain.</strong>
+              Publishing anchors the process, its questions and its census on the Vocdoni chain
+              — none of it can be edited, moved or removed after that. Review everything below,
+              then use the button in the sidebar to publish.
+            publish_confirm_vocdoni: "Publish this election to the blockchain? This is irreversible: the process, its questions and its census will be anchored on chain and cannot be edited afterwards."
       vocdoni:
         booth:
           launcher:

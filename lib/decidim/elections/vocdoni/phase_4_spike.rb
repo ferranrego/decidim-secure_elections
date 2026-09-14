@@ -8,17 +8,6 @@
 # Loaded only when the environment variable `PHASE_4_SPIKE=1` is set, so
 # the existing `Decidim::Elections::Vocdoni` production code path is
 # unaffected.
-#
-# Success criteria (verify in the Decidim admin):
-#   - The census-manifest combobox for a new election lists "Secure via
-#     Vocdoni (spike)".
-#   - The results-availability select on the election form lists
-#     "Blockchain-backed (spike)".
-#   - Publishing the election writes a line to the Rails log:
-#     "[phase-4-spike] publish_election:after fired for election #<id>".
-#
-# All three come out of upstream-hook subscriptions — no upstream file
-# is patched at runtime.
 
 require "decidim/elections"
 
@@ -31,9 +20,17 @@ module Decidim
 
         # Views + locales live under the spike's own path so nothing collides
         # with the main engine.
-        paths["app/views"] = "lib/decidim/elections/vocdoni/phase_4_spike/views"
         paths["config/locales"] = "lib/decidim/elections/vocdoni/phase_4_spike/config/locales"
 
+        # Registers the "Secure via Vocdoni" census manifest — the ONE thing
+        # an admin picks. Everything else that makes an election "Vocdoni-
+        # backed" (results anchored on chain, publish-locks-editing, voter
+        # booth SPA) is a consequence of this choice; there is no separate
+        # results-availability radio button to pick and no separate booth
+        # setting to configure. That is why we deliberately do NOT register
+        # a `:blockchain_backed` results_availability option — a stray choice
+        # of "Blockchain-backed results" on a CSV census would be incoherent
+        # and there is no way to enforce the coherence from the admin form.
         initializer "phase_4_spike.register_census_manifest" do
           Decidim::Elections.census_registry.register(:vocdoni_secure) do |manifest|
             manifest.admin_form = "Decidim::Elections::Vocdoni::AdminForms::CensusForm"
@@ -56,23 +53,33 @@ module Decidim
           end
         end
 
-        # Decorate upstream `Decidim::Elections::Election` with `has_one
-        # :vocdoni_process`, so `election.vocdoni_process` reads naturally
-        # everywhere. Runs on every code reload in development (`to_prepare`)
-        # and once in production, after Zeitwerk has loaded the upstream
-        # model. Idempotent — Rails allows `has_one` redeclaration.
+        # Decorate upstream `Decidim::Elections::Election` with a couple of
+        # spike-specific behaviours. Runs on every code reload in development
+        # (`to_prepare`) and once in production, after Zeitwerk has loaded the
+        # upstream model. Idempotent.
         initializer "phase_4_spike.extend_election_model" do |app|
           app.config.to_prepare do
+            # `has_one :vocdoni_process` so `election.vocdoni_process` reads
+            # naturally from everywhere without the caller needing to know
+            # about the sidecar table.
             Decidim::Elections::Election.has_one :vocdoni_process,
                                                  class_name: "Decidim::Elections::Vocdoni::Process",
                                                  foreign_key: "decidim_election_id",
                                                  dependent: :destroy,
                                                  inverse_of: :election
-          end
-        end
 
-        initializer "phase_4_spike.register_results_availability" do
-          Decidim::Elections.register_results_availability(:blockchain_backed)
+            # Publish is the point-of-no-return for a Vocdoni-backed election.
+            # Upstream keeps the election editable until Start (see
+            # `Election#editable?`: `published? ? !started? : !votes.exists?`)
+            # — for us that is wrong: as soon as the census, the questions
+            # and the endDate are anchored on chain, they cannot change.
+            # Locking here also locks the census tab and the questions tab,
+            # both of which gate on `election.editable?`
+            # (see decidim-elections/app/permissions/…/admin/permissions.rb).
+            Decidim::Elections::Election.prepend(
+              Decidim::Elections::Vocdoni::PublishLocksEditing
+            )
+          end
         end
 
         # Enqueues {PublishToVocdoniJob} whenever a Vocdoni-backed election is
@@ -80,45 +87,12 @@ module Decidim
         # `decidim.elections.admin.publish_election:after` notification added
         # by vocdoni/decidim#2 (see phase-4/integration).
         #
-        # The subscriber runs on the request thread but is intentionally cheap:
-        # the actual work happens in the Sidekiq job. Filters out elections
-        # that are not Vocdoni-backed so a plain-CSV election published in the
-        # same host does not enqueue anything.
         # `Decidim::Command#with_events` publishes via
-        # `ActiveSupport::Notifications.publish(name, **event_arguments)`, not
-        # `.instrument`. Subscribers therefore receive a 2-arg block —
+        # `ActiveSupport::Notifications.publish(name, **event_arguments)`,
+        # not `.instrument`. Subscribers therefore receive a 2-arg block —
         # `|event_name, data|` — where `data` is the kwargs hash, not the
         # standard 5-arg `|name, started, finished, id, payload|` shape that
-        # `instrument` uses. Getting this wrong raises `nil[:election]` on
-        # every publish.
-        # Adds the `/elections/:id/confirm_publish` route under the same admin
-        # namespace as the upstream elections controller, so its URL sits next
-        # to `/elections/:id/publish` in the admin dashboard.
-        initializer "phase_4_spike.append_confirm_publish_route", after: :add_routing_paths do
-          Decidim::Elections::AdminEngine.routes.append do
-            resources :elections, only: [] do
-              member do
-                get :confirm_publish, controller: "/decidim/elections/vocdoni/publish_confirmation", action: :show
-              end
-            end
-          end
-        end
-
-        # Interceptor that stands between the admin's click on "Publish" and
-        # {Decidim::Elections::Admin::ElectionsController#publish} for a
-        # Vocdoni-backed election. When the URL does not carry `confirmed=1`,
-        # the admin is bounced to the confirmation page (checklist +
-        # irreversibility warning). The button on that page re-issues the PUT
-        # with `confirmed=1`, which lets the interceptor pass and the upstream
-        # controller do its work.
-        initializer "phase_4_spike.intercept_publish_confirmation" do |app|
-          app.config.to_prepare do
-            Decidim::Elections::Admin::ElectionsController.prepend(
-              Decidim::Elections::Vocdoni::PublishInterceptor
-            )
-          end
-        end
-
+        # `instrument` uses.
         initializer "phase_4_spike.subscribe_to_publish" do
           ActiveSupport::Notifications.subscribe("decidim.elections.admin.publish_election:after") do |_event_name, data|
             election = data[:election]
