@@ -61,6 +61,52 @@ namespace :decidim_elections_vocdoni do
     end
   end
 
+  desc "List SaaS draft processes and (with APPLY=1) delete the ones with no matching sidecar"
+  task purge_stale_drafts: :environment do
+    unless Decidim::Elections::Vocdoni.configured?
+      abort "decidim-elections-vocdoni is not configured — nothing to talk to."
+    end
+
+    client = Decidim::Elections::Vocdoni::ApiClient.new
+    org = Decidim::Elections::Vocdoni.org_address
+    tracked = Decidim::Elections::Vocdoni::Process.where.not(vocdoni_process_id: nil).pluck(:vocdoni_process_id).to_set
+
+    resp = client.request(:get, "/organizations/#{org}/processes/drafts", auth: :required)
+    drafts = resp["processes"] || resp["drafts"] || resp["items"] || resp.values.find { |v| v.is_a?(Array) } || []
+
+    puts "org: #{org}"
+    puts "sidecars with a vocdoni_process_id: #{tracked.size}"
+    puts "SaaS drafts returned: #{drafts.size}"
+    drafts.each do |d|
+      id = d["id"]
+      title = (d.dig("title", "en") || d["title"]).to_s[0, 60]
+      puts "  id=#{id}  tracked=#{tracked.include?(id) ? "yes" : "NO"}  title=#{title}"
+    end
+
+    orphans = drafts.reject { |d| tracked.include?(d["id"]) }
+    if orphans.empty?
+      puts "\nNo orphans to purge."
+      next
+    end
+
+    unless ENV["APPLY"] == "1"
+      puts "\n#{orphans.size} orphan(s) would be deleted. Re-run with APPLY=1 to actually delete."
+      next
+    end
+
+    puts "\nDeleting #{orphans.size} orphan(s):"
+    orphans.each do |d|
+      id = d["id"]
+      print "  DELETE #{id} ... "
+      begin
+        client.elections.delete(id)
+        puts "OK"
+      rescue Decidim::Elections::Vocdoni::ApiError => e
+        puts "FAIL status=#{e.status} code=#{e.code} #{e.message.to_s[0, 120]}"
+      end
+    end
+  end
+
   # Reports whether a Sidekiq worker is running that listens on the `vocdoni`
   # queue. Sidekiq is queried through its own API rather than by parsing
   # sidekiq.yml, because the answer that matters is what is *running*, not
