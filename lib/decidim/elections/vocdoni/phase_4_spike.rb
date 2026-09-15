@@ -44,11 +44,20 @@ module Decidim
               # finish quickly against the stg SaaS. When we grow into real
               # deployments this cap goes away and the roster is picked
               # explicitly from the admin form.
-              Decidim::User
+              #
+              # The cap is applied through a subquery because upstream's
+              # `CensusManifest#users` composes an outer `.offset(page).limit(per_page)`
+              # on the returned relation and an outer `.limit` on ActiveRecord
+              # OVERRIDES a chained inner `.limit` on the same relation. A pluck
+              # + `where(id: …)` sidesteps the composition entirely: the outer
+              # `.limit` sees an id list and cannot expand it.
+              ids = Decidim::User
                 .where(organization: election.organization)
                 .where.not(email: nil)
                 .order(id: :asc)
                 .limit(20)
+                .pluck(:id)
+              Decidim::User.where(id: ids)
             end
           end
         end
