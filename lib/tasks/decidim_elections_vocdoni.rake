@@ -71,8 +71,12 @@ namespace :decidim_elections_vocdoni do
     org = Decidim::Elections::Vocdoni.org_address
     tracked = Decidim::Elections::Vocdoni::Process.where.not(vocdoni_process_id: nil).pluck(:vocdoni_process_id).to_set
 
-    resp = client.request(:get, "/organizations/#{org}/processes/drafts", auth: :required)
-    drafts = resp["processes"] || resp["drafts"] || resp["items"] || resp.values.find { |v| v.is_a?(Array) } || []
+    # Uses the new multi-question API listing endpoint. The legacy
+    # /organizations/{addr}/processes/drafts route reads the old `processes`
+    # collection, which is invisible to POST /processes (which writes the new
+    # `votingProcesses` collection).
+    resp = client.request(:get, "/processes?orgAddress=#{org}&published=false&limit=1000", auth: :required)
+    drafts = resp["processes"] || []
 
     puts "org: #{org}"
     puts "sidecars with a vocdoni_process_id: #{tracked.size}"

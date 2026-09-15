@@ -136,14 +136,31 @@ module Decidim
             )
           end
 
-          response = client.organizations.add_members(org_address, payloads).to_h
+          # POST /organizations/{addr}/members is *not* upsert-by-memberNumber
+          # upstream: pushing the same roster twice creates fresh OrgMember docs
+          # with duplicate memberNumbers, and the census publish then dupe-keys
+          # on the (censusId, loginHash) unique index because the clones all
+          # hash to the same auth-field value. Filter by what is already there.
+          existing = upstream_member_index
+          # Index keys are lowercased+stripped; mirror that when looking up.
+          fresh = payloads.reject { |p| existing.key?("memberNumber:#{p["memberNumber"].to_s.strip.downcase}") }
+          if fresh.empty?
+            # Every voter is already in the memberbase from a previous attempt
+            # — skip the POST and let ensure_group_created! reuse the ids.
+            return
+          end
+
+          response = client.organizations.add_members(org_address, fresh).to_h
           await_job!(response["jobId"])
+          # The push added rows the memoized index has not seen; drop it so
+          # resolve_member_ids! rewalks and picks up the new ids.
+          @upstream_member_index = nil
 
           errors = Array(response["errors"]).map(&:to_s).compact_blank
           return if errors.empty?
 
           raise Decidim::Elections::Vocdoni::ApiError.new(
-            "The Vocdoni memberbase rejected #{errors.size} of #{payloads.size} voters: #{errors.join("; ")}",
+            "The Vocdoni memberbase rejected #{errors.size} of #{fresh.size} voters: #{errors.join("; ")}",
             body: response,
             transient: false
           )
@@ -342,7 +359,13 @@ module Decidim
           end.compact
         end
 
+        # Memoized so ensure_members_pushed! (which reads it to dedupe against
+        # the memberbase) and resolve_member_ids! (which reads it to look up
+        # ids for the group) share one walk. Callers that add members must
+        # invalidate `@upstream_member_index` so the next read rewalks.
         def upstream_member_index
+          return @upstream_member_index if @upstream_member_index
+
           index = {}
           page = 1
           pages = 0
@@ -371,7 +394,7 @@ module Decidim
             page = next_page
           end
 
-          index
+          @upstream_member_index = index
         end
 
         # ---------------------------------------------------------------------
