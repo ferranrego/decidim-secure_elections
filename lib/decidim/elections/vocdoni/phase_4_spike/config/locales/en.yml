@@ -1,5 +1,11 @@
 en:
   decidim:
+    admin:
+      menu:
+        # Injected into upstream's `admin_elections_menu` from the
+        # phase-4 spike engine; only appears for :vocdoni_secure elections.
+        elections_menu:
+          security: "Security"
     elections:
       censuses:
         # Per-manifest override of the upstream `census_size_html`. The

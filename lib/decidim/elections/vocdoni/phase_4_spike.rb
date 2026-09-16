@@ -91,6 +91,44 @@ module Decidim
           end
         end
 
+        # Injects a Security tab into upstream `Decidim::Elections::AdminEngine`
+        # for `:vocdoni_secure` elections — the tab that owns the second-factor
+        # choice (email OTP, SMS OTP, both, or none) forwarded to the SaaS as
+        # `twoFaFields` at publish. Two hooks, both idempotent:
+        #
+        #  1. `routes.append` bolts `resource :security` onto the same nested
+        #     `resources :elections` block upstream declares, so the URL sits
+        #     next to the Census tab (`/elections/:id/security`). The
+        #     controller is named with a leading slash to escape upstream's
+        #     `isolate_namespace Decidim::Elections::Admin` — the class lives
+        #     in `Decidim::Elections::Vocdoni::Admin`.
+        #
+        #  2. The `admin_elections_menu` block is called back every time the
+        #     menu is rendered, so a bare census_manifest guard is enough to
+        #     hide the tab on internal_users elections without touching the
+        #     upstream item list.
+        initializer "phase_4_spike.security_tab" do
+          Decidim::Elections::AdminEngine.routes.append do
+            resources :elections, only: [] do
+              resource :security, only: [:show, :update],
+                                  controller: "/decidim/elections/vocdoni/admin/security"
+            end
+          end
+
+          Decidim.menu :admin_elections_menu do |menu|
+            election = @election
+            next unless election.present? && election.census_manifest.to_s == "vocdoni_secure"
+
+            proxy = Decidim::EngineRouter.admin_proxy(election.component)
+            security_path = proxy&.election_security_path(election)
+            menu.add_item :vocdoni_security,
+                          I18n.t("security", scope: "decidim.admin.menu.elections_menu"),
+                          security_path,
+                          active: security_path.present? && is_active_link?(security_path),
+                          icon_name: "shield-keyhole-line"
+          end
+        end
+
         # Enqueues {PublishToVocdoniJob} whenever a Vocdoni-backed election is
         # published from the Decidim admin. The subscription piggybacks on the
         # `decidim.elections.admin.publish_election:after` notification added

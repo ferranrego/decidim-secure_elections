@@ -55,12 +55,6 @@ module Decidim
           post "census/verifications", to: "census#import_from_verifications", as: :census_verifications
           delete "census/clear", to: "census#clear", as: :census_clear
 
-          # Security tab (vocdoni_secure only). Owns the second-factor choice
-          # (email OTP, SMS OTP, both, or none) that becomes `twoFaFields` at
-          # publish. Ships as its own tab so the Census tab can stay about who
-          # the voters are, and this one about how the CSP challenges them.
-          resource :security, only: [:show, :update], controller: "security"
-
           # Dashboard tab: pre-publish checklist + publish action (unpublished),
           # or live status + results + monitor controls (published/on-chain).
           resource :dashboard, only: [:show], controller: "dashboard" do
@@ -103,17 +97,6 @@ module Decidim
                         @election&.step_reachable?(:census) ? proxy&.election_census_path(@election) : "#",
                         active: @election.present? && is_active_link?(proxy&.election_census_path(@election)),
                         icon_name: "group-2-line"
-
-          # Vocdoni-only tab; hidden for the internal_users manifest, which
-          # has no equivalent second-factor concept. Same reachability rule as
-          # Census (share the same prerequisites: an election with questions).
-          if @election.present? && @election.census_manifest.to_s == "vocdoni_secure"
-            menu.add_item :vocdoni_security,
-                          I18n.t("security", scope: "decidim.elections.vocdoni.admin.menu"),
-                          @election.step_reachable?(:census) ? proxy&.election_security_path(@election) : "#",
-                          active: is_active_link?(proxy&.election_security_path(@election)),
-                          icon_name: "shield-keyhole-line"
-          end
 
           menu.add_item :vocdoni_dashboard,
                         I18n.t("dashboard", scope: "decidim.elections.vocdoni.admin.menu"),
