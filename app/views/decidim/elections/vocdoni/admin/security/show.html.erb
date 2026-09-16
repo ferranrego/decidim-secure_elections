@@ -1,0 +1,46 @@
+<%#
+  Security tab (vocdoni_secure only). Owns the second-factor choice.
+  Two checkboxes — SMS + Email — that map to `twoFaFields` in the
+  eventual /processes payload. Any combination is valid; both ticked
+  means the SaaS lets the voter pick between them at auth time.
+
+  Saving re-runs the census pre-flight, mirroring the Census tab, so the
+  Dashboard reflects the current combination's validity immediately.
+%>
+<% add_decidim_page_title(t(".title")) %>
+
+<%= render partial: "decidim/elections/vocdoni/admin/shared/election_header", locals: { election: } %>
+<%= render "decidim/elections/vocdoni/admin/elections/tabs_menu" %>
+
+<div class="item__edit item__edit-1col">
+  <div class="item__edit-form">
+    <%= decidim_form_for(@form,
+                         url: election_security_path(election),
+                         method: :put,
+                         html: { class: "form" }) do |f| %>
+      <div class="card">
+        <div class="card-section">
+          <h2 class="card-title h4"><%= t(".heading") %></h2>
+          <p class="help-text"><%= t(".help_html").html_safe %></p>
+
+          <div class="mt-4">
+            <div class="row">
+              <%= f.check_box :sms, label: t(".sms_label"), help_text: t(".sms_help") %>
+            </div>
+            <div class="row mt-2">
+              <%= f.check_box :email, label: t(".email_label"), help_text: t(".email_help") %>
+            </div>
+          </div>
+
+          <p class="help-text mt-4 italic"><%= t(".both_note") %></p>
+        </div>
+      </div>
+
+      <div class="item__edit-sticky">
+        <div class="item__edit-sticky-container">
+          <%= f.submit t(".save"), class: "button button__sm button__secondary" %>
+        </div>
+      </div>
+    <% end %>
+  </div>
+</div>

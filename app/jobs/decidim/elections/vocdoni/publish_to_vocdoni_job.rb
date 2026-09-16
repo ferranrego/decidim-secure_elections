@@ -49,21 +49,18 @@ module Decidim
         # Defensive bound on the memberbase pagination walk.
         MAX_MEMBER_PAGES = 200
 
-        # Split of the credential fields the CensusForm exposes into what the
-        # Vocdoni SaaS calls authFields (proven by the census-authentication
-        # step) vs twoFaFields (proven by an OTP the CSP sends to the voter).
-        # Names on the right are the SaaS's own camelCase; the ones on the
-        # left are how our CensusForm names them.
+        # Map from the Census-tab credential-field names onto the SaaS's own
+        # camelCase names used inside `authFields`. `email` and `phone` are
+        # allowed to appear as identity fields (the voter types them at CSP
+        # auth) — enabling an OTP challenge on top is the Security tab's
+        # concern and lives in `census_settings["twofa_fields"]`.
         AUTH_FIELD_MAP = {
           "member_number" => "memberNumber",
           "national_id"   => "nationalId",
           "date_of_birth" => "birthDate",
-          "name"          => "name"
-        }.freeze
-
-        TWO_FA_FIELD_MAP = {
-          "email" => "email",
-          "phone" => "phone"
+          "name"          => "name",
+          "email"         => "email",
+          "phone"         => "phone"
         }.freeze
 
         def perform(election_id)
@@ -556,16 +553,11 @@ module Decidim
         # Config
         # ---------------------------------------------------------------------
 
-        # The credential fields the admin ticked on the Census form, mapped
-        # onto what the SaaS API expects, split across authFields (the census
-        # authenticates on these) and twoFaFields (the CSP proves these via
-        # an OTP delivered to the voter).
-        #
-        # `memberNumber` is always in authFields whether the admin picked it
-        # or not, because the census still needs at least one authField and
-        # every roster row we push carries a stable member number
-        # (`Decidim::User#id`). This is the minimum the census needs to
-        # authenticate.
+        # The credential fields the admin ticked on the Census tab, mapped
+        # onto the SaaS's own names. `memberNumber` is always in authFields
+        # whether the admin picked it or not, because the census still needs
+        # at least one authField and every roster row we push carries a
+        # stable member number (`Decidim::User#id`).
         def credential_field_selection
           Array(election.census_settings["credential_fields"]).map(&:to_s)
         end
@@ -577,8 +569,13 @@ module Decidim
           fields.uniq
         end
 
+        # Second-factor selection lives on the Security tab and is written
+        # into `census_settings["twofa_fields"]` verbatim in SaaS shape
+        # (`["email"]`, `["phone"]`, `["email","phone"]` or `[]`). An
+        # election that has never visited the Security tab has no key here
+        # and the SaaS payload gets no `twoFaFields` at all — CSP auth only.
         def two_fa_fields
-          credential_field_selection.filter_map { |f| TWO_FA_FIELD_MAP[f] }
+          Array(election.census_settings["twofa_fields"]).map(&:to_s)
         end
 
         def org_address

@@ -3,9 +3,10 @@
   for a `:vocdoni_secure` election.
 
   Two sections:
-   1. The credential-field checkboxes — what the admin ticks decides which
-      fields go to Vocdoni's CSP as `authFields` and which as `twoFaFields`
-      (see PublishToVocdoniJob's AUTH_FIELD_MAP / TWO_FA_FIELD_MAP).
+   1. The credential-field checkboxes — the identity fields a voter types
+      at CSP auth time (all become entries in `authFields` in the SaaS
+      payload). Second-factor OTP selection is on its own Security tab and
+      is written to `census_settings["twofa_fields"]` from there.
    2. The census pre-flight result — populated by `AfterUpdateCensus`, which
       runs `PublishToVocdoniJob.preview_census!` on save. `ok:true` unblocks
       the Publish button on the Dashboard; anything else keeps it disabled

@@ -303,6 +303,7 @@ en:
             monitor: Monitor
             publish: Publish
             questions: Questions
+            security: Security
           monitor:
             answer: Answer
             errors:

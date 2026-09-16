@@ -57,6 +57,21 @@ en:
             vocdoni_census_pending_html: "Save the <a href=\"%{census_url}\">Census tab</a> at least once to run the pre-flight against Vocdoni. Publish is disabled until the pre-flight succeeds."
             vocdoni_publish_disabled_title: "The last census pre-flight failed or has not been run yet. Open the Census tab and save it to try again."
       vocdoni:
+        admin:
+          security:
+            show:
+              title: "Security"
+              heading: "Second-factor authentication"
+              help_html: "Pick which one-time codes the Vocdoni CSP sends to each voter after they authenticate. Codes go to values already on file in the Vocdoni memberbase — voters do not type their address at auth time. Leave both unchecked to authenticate voters on credentials alone (weaker)."
+              sms_label: "SMS one-time code"
+              sms_help: "Requires every voter to have a phone number on their memberbase entry."
+              email_label: "Email one-time code"
+              email_help: "Requires every voter to have an email address on their memberbase entry."
+              both_note: "If both are checked, the voter picks which one to receive at authentication time."
+              save: "Save"
+            update:
+              success: "Security settings updated. Census pre-flight is being re-run against Vocdoni."
+              invalid: "Security settings could not be saved. Please review the errors below."
         booth:
           launcher:
             help_html: "Your ballot is signed and submitted in your browser. The Decidim server never sees a vote."
