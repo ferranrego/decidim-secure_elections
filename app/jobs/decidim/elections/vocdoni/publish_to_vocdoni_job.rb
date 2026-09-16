@@ -169,6 +169,23 @@ module Decidim
           record_preview_failure!(e)
         end
 
+        # SaaS 400s carry `{"error":..., "code":..., "data":{...}}` as JSON;
+        # Faraday's json middleware only parses it into a Hash when the
+        # response's `Content-Type` matches `/\bjson$/`, so anything with a
+        # `; charset=utf-8` suffix (or a proxy that stripped it) leaves us
+        # with the raw body as a String. Fall back to a manual JSON parse
+        # so `data.duplicates` / `data.missingData` reach the admin either
+        # way.
+        def extract_error_data(error)
+          return nil unless error.respond_to?(:body)
+
+          body = error.try(:body)
+          body = (JSON.parse(body) rescue nil) if body.is_a?(String)
+          return nil unless body.is_a?(Hash)
+
+          body["data"]
+        end
+
         # Called from both rescue arms of `perform`. Persists the failure
         # against the process (state: failed, last_error) AND, when the step
         # that blew up was the census pre-flight, mirrors the payload into
@@ -176,7 +193,7 @@ module Decidim
         # ok=false also reads a publish-time ok=false.
         def record_step_failure!(error)
           message = redact(error.message)
-          body_data = error.respond_to?(:body) ? error.try(:body)&.dig("data") : nil
+          body_data = extract_error_data(error)
           error_code = error.respond_to?(:code) ? error.try(:code) : nil
 
           process.record_failure!(message, step: @step, code: error_code, data: body_data)
@@ -199,7 +216,7 @@ module Decidim
         # metadata key.
         def record_preview_failure!(error)
           message = redact(error.message)
-          body_data = error.respond_to?(:body) ? error.try(:body)&.dig("data") : nil
+          body_data = extract_error_data(error)
           error_code = error.respond_to?(:code) ? error.try(:code) : nil
 
           process.record_census_validation!(
