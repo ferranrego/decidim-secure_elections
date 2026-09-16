@@ -133,14 +133,14 @@ module Decidim
           let(:payload) do
             super().tap do |draft|
               draft[:questions][0][:type] = "multichoice"
-              draft[:questions][0][:typeSetup] = { maxChoices: 2, minChoices: 1, uniqueChoices: true }
+              draft[:questions][0][:typeSetup] = { maxChoices: 2, minChoices: 1 }
             end
           end
 
           let(:expected_body) do
             super().tap do |body|
               body["questions"][0]["type"] = "multichoice"
-              body["questions"][0]["typeSetup"] = { "maxChoices" => 2, "minChoices" => 1, "uniqueChoices" => true }
+              body["questions"][0]["typeSetup"] = { "maxChoices" => 2, "minChoices" => 1 }
             end
           end
 

@@ -613,11 +613,14 @@ module Decidim
         payload["description"] = description if description.present?
         payload["secretUntilTheEnd"] = true if question.secret_until_the_end?
 
+        # Only multichoice carries typeSetup, and only the bounds. The SaaS
+        # rejects `uniqueChoices` because each multichoice choice is an
+        # independent 0/1 field — a duplicate is already impossible, and a
+        # uniqueValues ballot over the fields would admit no vote at all.
         if question.multichoice?
           payload["typeSetup"] = {
             "maxChoices" => question.effective_max_choices,
-            "minChoices" => question.effective_min_choices,
-            "uniqueChoices" => true
+            "minChoices" => question.effective_min_choices
           }
         end
 

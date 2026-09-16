@@ -427,12 +427,16 @@ module Decidim
           description = localize(question.description)
           payload["description"] = description if description.present?
 
-          max = question.max_choices.to_i
-          if type == "multichoice" || max > 1
+          # Only multichoice carries typeSetup: singlechoice ignores it, ranked
+          # and cumulative reject it (see saas-backend api/processes.go). And
+          # multichoice's typeSetup is just the bounds — `uniqueChoices` is
+          # rejected because each choice is an independent 0/1 field, so a
+          # duplicate is already impossible.
+          if type == "multichoice"
+            max = question.max_choices.to_i
             payload["typeSetup"] = {
               "maxChoices" => [max, 1].max,
-              "minChoices" => question.mandatory? ? 1 : 0,
-              "uniqueChoices" => true
+              "minChoices" => question.mandatory? ? 1 : 0
             }
           end
 
