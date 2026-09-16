@@ -9,13 +9,23 @@
 %>
 <% add_decidim_page_title(t(".title")) %>
 
-<%= render partial: "decidim/elections/vocdoni/admin/shared/election_header", locals: { election: } %>
-<%= render "decidim/elections/vocdoni/admin/elections/tabs_menu" %>
+<%# Render upstream's tabs menu (admin_elections_menu), which is where the
+    phase-4 spike injects the Security item. The vocdoni admin engine has
+    its own tabs partial but the elections component routes through
+    upstream, so upstream's is the one that matches the rest of the flow. %>
+<%= render "decidim/elections/admin/elections/tabs_menu" %>
 
 <div class="item__edit item__edit-1col">
   <div class="item__edit-form">
+    <%# `request.path` targets `/…/elections/:id/security`, which is exactly
+        the URL bound to `#update` when using `resource :security` (show
+        and update share the same path). Kept as a string rather than the
+        named helper because this view is rendered inside upstream's admin
+        engine, whose url_helpers do not know the injected security route
+        until Rails' method_missing resolution kicks in — a `request.path`
+        avoids a NameError in the unlucky race. %>
     <%= decidim_form_for(@form,
-                         url: election_security_path(election),
+                         url: request.path,
                          method: :put,
                          html: { class: "form" }) do |f| %>
       <div class="card">

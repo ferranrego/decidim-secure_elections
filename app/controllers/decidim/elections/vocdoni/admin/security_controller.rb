@@ -9,15 +9,16 @@ module Decidim
         # verbatim as `twoFaFields` when it creates the process on Vocdoni's
         # SaaS. Storage is `election.census_settings["twofa_fields"]`.
         #
-        # Reuses the `:census` wizard step and permission: Security has the
-        # same prerequisites (an election with complete questions and a
-        # census manifest picked), and giving it its own permission action
-        # would only add ceremony for a page that always tracks Census.
-        class SecurityController < Admin::ApplicationController
-          wizard_step :census
+        # Inherits from upstream's `Decidim::Elections::Admin::ApplicationController`
+        # rather than the Vocdoni admin base, because in the phase-4 spike
+        # the elections component uses upstream's admin engine and its
+        # controllers work off `Decidim::Elections::Election`, not the
+        # Vocdoni-only Election model.
+        class SecurityController < ::Decidim::Elections::Admin::ApplicationController
+          helper_method :election
 
           def show
-            enforce_permission_to(:read, :census, election:)
+            enforce_permission_to(:update, :census, election:)
 
             @form = security_form
           end
@@ -41,6 +42,10 @@ module Decidim
           end
 
           private
+
+          def election
+            @election ||= ::Decidim::Elections::Election.where(component: current_component).find(params[:election_id])
+          end
 
           def security_form
             AdminForms::SecurityForm.from_model(election)
