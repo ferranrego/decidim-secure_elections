@@ -51,16 +51,16 @@ module Decidim
 
         # Map from the Census-tab credential-field names onto the SaaS's own
         # camelCase names used inside `authFields`. `email` and `phone` are
-        # allowed to appear as identity fields (the voter types them at CSP
-        # auth) — enabling an OTP challenge on top is the Security tab's
-        # concern and lives in `census_settings["twofa_fields"]`.
+        # deliberately absent: the SaaS rejects them as authFields (proven
+        # by /processes/census/validation, which 400s on any payload that
+        # names either — with or without an overlapping twoFaFields entry).
+        # They are 2FA-only from the SaaS's perspective and live in
+        # `census_settings["twofa_fields"]`, driven by the Security tab.
         AUTH_FIELD_MAP = {
           "member_number" => "memberNumber",
           "national_id"   => "nationalId",
           "date_of_birth" => "birthDate",
-          "name"          => "name",
-          "email"         => "email",
-          "phone"         => "phone"
+          "name"          => "name"
         }.freeze
 
         def perform(election_id)
