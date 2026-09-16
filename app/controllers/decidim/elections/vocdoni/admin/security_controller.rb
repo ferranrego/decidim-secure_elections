@@ -27,11 +27,16 @@ module Decidim
             enforce_permission_to(:update, :census, election:)
 
             @form = form(AdminForms::SecurityForm).from_params(params)
+            # Captured before the Decidim::Command call because on(:ok)/on(:invalid)
+            # run with `instance_eval` inside the command: `self` there is the
+            # command, not the controller, so route helpers and `request.path`
+            # would raise NoMethodError.
+            self_path = request.path
 
             UpdateElectionSecurity.call(@form, election) do
               on(:ok) do
                 flash[:notice] = I18n.t("security.update.success", scope: "decidim.elections.vocdoni.admin")
-                redirect_to election_security_path(election)
+                redirect_to self_path
               end
 
               on(:invalid) do
