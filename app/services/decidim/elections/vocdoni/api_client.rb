@@ -126,15 +126,6 @@ module Decidim
         @organizations ||= Organizations.new(self)
       end
 
-      # Org-level censuses. A *process* census is inline in the create payload,
-      # but the member group it points at has to be materialized as a CSP
-      # census first — that is what these routes do (ARCHITECTURE §4c).
-      #
-      # @return [Decidim::Elections::Vocdoni::ApiClient::Census]
-      def census
-        @census ||= Census.new(self)
-      end
-
       # Async jobs returned by publish, status changes and the vote relay.
       #
       # @return [Decidim::Elections::Vocdoni::ApiClient::Jobs]

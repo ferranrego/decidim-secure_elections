@@ -115,48 +115,6 @@ module Decidim
           client.post("/organizations/#{org_address}/groups", body:)
         end
 
-        # Checks that every member of a group carries the fields the census
-        # will authenticate on —
-        # `POST /organizations/{address}/groups/{group_id}/validate`.
-        #
-        # Step 3 of the census sequence (ARCHITECTURE §4c), and the reason the
-        # sequence is worth running: it catches "you asked to authenticate on
-        # `nationalId` but twelve members have none" *before* anything is
-        # written on chain.
-        #
-        # A 400 here is therefore an **answer, not a transport failure**, and
-        # retrying it would fail identically. It arrives as
-        #
-        #   {"error":"invalid data provided","code":40037,
-        #    "data":{"memberIds":[],"duplicates":[],
-        #            "missingData":["<memberId>", …],"notFound":[]}}
-        #
-        # and is raised as a {Decidim::Elections::Vocdoni::ApiError} whose `body` keeps
-        # `data` intact. Those member ids are the only actionable part of the
-        # failure — a caller that stores just the message throws away the
-        # ability to tell the admin *who* is missing *what*.
-        #
-        # Success is HTTP 200 with an **empty body**; no JSON comes back.
-        #
-        # @param org_address [String] `0x…` organization address.
-        # @param group_id [String] member-group id.
-        # @param auth_fields [Array<String>, nil] credentials the census
-        #   authenticates on (`name`, `surname`, `memberNumber`, `nationalId`,
-        #   `birthDate`).
-        # @param two_fa_fields [Array<String>, nil] OTP channels (`email`,
-        #   `phone`). Empty for an auth-only census.
-        # @return [Hash] an empty hash on success.
-        # @raise [Decidim::Elections::Vocdoni::ApiError] `status` 400 when a member lacks
-        #   a requested field, is duplicated or is unknown.
-        def validate_group(org_address, group_id, auth_fields: nil, two_fa_fields: nil)
-          body = {
-            "authFields" => field_list(auth_fields),
-            "twoFaFields" => field_list(two_fa_fields)
-          }.compact
-
-          client.post("/organizations/#{org_address}/groups/#{group_id}/validate", body:)
-        end
-
         # Lists the organization's member groups —
         # `GET /organizations/{address}/groups`.
         #
@@ -169,17 +127,6 @@ module Decidim
         # @raise [Decidim::Elections::Vocdoni::ApiError]
         def groups(org_address)
           client.get("/organizations/#{org_address}/groups")
-        end
-
-        private
-
-        # An empty list of fields says nothing and is dropped rather than sent:
-        # absent `twoFaFields` is how an auth-only census is expressed.
-        #
-        # @param value [Array<String, Symbol>, String, nil]
-        # @return [Array<String>, nil]
-        def field_list(value)
-          Array(value).map(&:to_s).compact_blank.presence
         end
       end
     end

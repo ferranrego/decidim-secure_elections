@@ -143,7 +143,13 @@ module Decidim
       # ---------------------------------------------------------------------
       # Census (ARCHITECTURE §4c)
       #
-      # members -> group -> validate -> census -> publish census
+      # members -> group -> validate census
+      #
+      # The multi-question `/processes` API carries the census inline in the
+      # create body and publishes it as part of `POST /processes/{id}/publish`,
+      # so the old two-step "create census + publish from group" is folded into
+      # `ensure_process_created!` + `ensure_process_published!`. What is left
+      # here is the pre-flight uniqueness check.
       # ---------------------------------------------------------------------
 
       # @return [Boolean] false when the census is unusable, in which case the
@@ -161,10 +167,7 @@ module Decidim
           return false
         end
 
-        return false unless ensure_group_validated!
-
-        ensure_census_published!
-        true
+        ensure_census_validated!
       end
 
       # Step 1 — `POST /organizations/{addr}/members`.
@@ -233,22 +236,19 @@ module Decidim
         election.update!(census_group_id: group_id)
       end
 
-      # Step 3 — `POST /organizations/{addr}/groups/{gid}/validate`.
+      # Step 3 — `POST /processes/census/validation`.
       #
-      # The call that catches a census unable to authenticate its own members
-      # before anything reaches the chain. Its 400 is an answer rather than a
-      # fault: retrying it would fail identically, so the job records *which*
-      # members lack *which* field and stops, leaving the election editable.
+      # Catches a census unable to authenticate its own members before the
+      # process is created, by re-using the very same census spec that
+      # {#census_payload} embeds inline in `POST /processes`. A 400 is an
+      # actionable answer rather than a fault (retrying would fail
+      # identically): the job records *which* members lack *what* field and
+      # stops, leaving the election editable.
       #
       # @return [Boolean] false when the group is not usable.
-      def ensure_group_validated!
-        @step = "validate_group"
-        client.organizations.validate_group(
-          org_address,
-          election.census_group_id,
-          auth_fields: election.auth_fields.presence,
-          two_fa_fields: election.two_fa_fields.presence
-        )
+      def ensure_census_validated!
+        @step = "validate_census"
+        client.elections.validate_census(org_address, census_payload)
         true
       rescue Decidim::Elections::Vocdoni::ApiError => e
         raise unless e.status == 400
@@ -256,32 +256,6 @@ module Decidim
         record_failure!(election, e, step: @step, details: api_error_details(e))
         reset_status_after_failure!
         false
-      end
-
-      # Steps 4 and 5 — `POST /census`, then
-      # `POST /census/{id}/group/{gid}/publish`.
-      #
-      # The census object is transient: the process references the *group*, so
-      # there is nothing to store afterwards and the schema has no column for
-      # it (ARCHITECTURE §4b). What the publish yields that matters is the size —
-      # the number of voters the chain will accept.
-      def ensure_census_published!
-        @step = "create_census"
-        created = client.census.create(org_address).to_h
-        @census_id = created["id"].presence
-        raise Decidim::Elections::Vocdoni::ApiError.new("POST /census returned no id", body: created, transient: false) if @census_id.blank?
-
-        @step = "publish_census"
-        published = client.census.publish_group(
-          @census_id,
-          election.census_group_id,
-          auth_fields: election.auth_fields.presence,
-          two_fa_fields: election.two_fa_fields.presence,
-          weighted: weighted?
-        ).to_h
-
-        size = published["size"].to_i
-        election.update!(census_size: size) if size.positive?
       end
 
       # ---------------------------------------------------------------------

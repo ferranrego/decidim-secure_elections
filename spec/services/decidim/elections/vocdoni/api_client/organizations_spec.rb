@@ -153,61 +153,6 @@ module Decidim
         end
       end
 
-      describe "#validate_group" do
-        let(:group_id) { "6a677022622d94e7c9a1929a" }
-        let(:validate_url) { "#{api_url}/organizations/#{org_address}/groups/#{group_id}/validate" }
-
-        it "sends the fields the census will authenticate on" do
-          request = stub_request(:post, validate_url)
-                    .with(body: { "authFields" => ["memberNumber"], "twoFaFields" => ["email"] })
-                    .to_return(status: 200, body: "")
-
-          organizations.validate_group(org_address, group_id, auth_fields: ["memberNumber"], two_fa_fields: ["email"])
-
-          expect(request).to have_been_requested
-        end
-
-        it "answers an empty hash to the empty body a success returns" do
-          stub_request(:post, validate_url).to_return(status: 200, body: "")
-
-          expect(organizations.validate_group(org_address, group_id, auth_fields: ["memberNumber"])).to eq({})
-        end
-
-        it "drops an empty two-factor list, which is how an auth-only census is expressed" do
-          request = stub_request(:post, validate_url)
-                    .with(body: { "authFields" => ["memberNumber"] })
-                    .to_return(status: 200, body: "")
-
-          organizations.validate_group(org_address, group_id, auth_fields: ["memberNumber"], two_fa_fields: [])
-
-          expect(request).to have_been_requested
-        end
-
-        context "when members lack a requested field" do
-          before do
-            stub_request(:post, validate_url)
-              .to_return(status: 400, body: vocdoni_fixture("group_validation_failed"), headers: json_headers)
-          end
-
-          it "raises rather than letting an unusable census reach the chain" do
-            expect { organizations.validate_group(org_address, group_id, auth_fields: ["nationalId"]) }
-              .to raise_error(Decidim::Elections::Vocdoni::ApiError) do |error|
-                expect(error.status).to eq(400)
-                expect(error.code).to eq(40_037)
-                expect(error.message).to include("invalid data provided")
-              end
-          end
-
-          it "keeps the offending member ids intact on the error" do
-            expect { organizations.validate_group(org_address, group_id, auth_fields: ["nationalId"]) }
-              .to raise_error(Decidim::Elections::Vocdoni::ApiError) do |error|
-                expect(error.body.dig("data", "missingData"))
-                  .to eq(%w(6a677022622d94e7c9a19301 6a677022622d94e7c9a19302))
-              end
-          end
-        end
-      end
-
       describe "#groups" do
         it "lists the member groups, including the auto group used as a census" do
           request = stub_request(:get, "#{api_url}/organizations/#{org_address}/groups")

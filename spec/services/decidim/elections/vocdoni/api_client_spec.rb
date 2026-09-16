@@ -65,7 +65,6 @@ module Decidim
         it "exposes and memoizes each one" do
           expect(client.elections).to be_a(described_class::Elections)
           expect(client.organizations).to be_a(described_class::Organizations)
-          expect(client.census).to be_a(described_class::Census)
           expect(client.jobs).to be_a(described_class::Jobs)
 
           expect(client.elections).to equal(client.elections)

@@ -52,6 +52,33 @@ module Decidim
           client.post("/processes", body: normalize_process(payload))
         end
 
+        # Pre-flight uniqueness check on a process census —
+        # `POST /processes/census/validation`.
+        #
+        # Verifies the chosen `authFields` (+ optional `twoFaFields`) produce
+        # unique, complete credentials over the target members: a group
+        # (`groupId`), an explicit `memberIds` list, or the whole organization
+        # when neither is set. Success is HTTP 200; failure is HTTP 400 with
+        # the offending member ids under `body.data.{duplicates,missingData}`
+        # — the same shape the deprecated `POST /organizations/{addr}/groups/
+        # {id}/validate` used.
+        #
+        # @param org_address [String, nil] `0x…` organization address. Defaults
+        #   to the configured `Decidim::Elections::Vocdoni.org_address`.
+        # @param census [Hash] a census spec: `{authFields:, twoFaFields:,
+        #   groupId:, weighted:}` — the very payload that {#create} would
+        #   embed inline in the process.
+        # @return [Hash]
+        # @raise [Decidim::Elections::Vocdoni::ApiError] 400 with member ids
+        #   when the census is not usable.
+        def validate_census(org_address, census)
+          body = {
+            "orgAddress" => org_address.presence || Decidim::Elections::Vocdoni.org_address,
+            "census" => census
+          }
+          client.post("/processes/census/validation", body:)
+        end
+
         # Reads a process — `GET /processes/{id}`.
         #
         # This is the only supported source of `chainId` (never `GET /info`).

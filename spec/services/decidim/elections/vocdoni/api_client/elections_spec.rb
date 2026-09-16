@@ -198,6 +198,37 @@ module Decidim
         end
       end
 
+      describe "#validate_census" do
+        let(:census_spec) do
+          {
+            "authFields" => ["memberNumber"],
+            "twoFaFields" => ["email"],
+            "groupId" => "6a677022622d94e7c9a1929a",
+            "weighted" => false
+          }
+        end
+
+        it "posts the census spec under a process draft body" do
+          request = stub_request(:post, "#{api_url}/processes/census/validation")
+                    .with(body: { "orgAddress" => org_address, "census" => census_spec })
+                    .to_return(status: 200, body: "")
+
+          elections.validate_census(org_address, census_spec)
+
+          expect(request).to have_been_requested
+        end
+
+        it "falls back to the configured org address when none is given" do
+          request = stub_request(:post, "#{api_url}/processes/census/validation")
+                    .with(body: { "orgAddress" => Decidim::Elections::Vocdoni.org_address, "census" => census_spec })
+                    .to_return(status: 200, body: "")
+
+          elections.validate_census(nil, census_spec)
+
+          expect(request).to have_been_requested
+        end
+      end
+
       describe "#publish" do
         it "enqueues the on-chain publication" do
           request = stub_request(:post, "#{api_url}/processes/#{process_id}/publish")

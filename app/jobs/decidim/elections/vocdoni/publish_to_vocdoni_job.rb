@@ -83,8 +83,7 @@ module Decidim
 
           ensure_members_pushed!
           ensure_group_created!
-          ensure_group_validated!
-          ensure_census_published!
+          ensure_census_validated!
           ensure_process_created!
           ensure_process_published!
           persist_process_metadata!
@@ -191,14 +190,18 @@ module Decidim
           process.update!(census_group_id: group_id)
         end
 
-        def ensure_group_validated!
-          @step = "validate_group"
-          client.organizations.validate_group(
-            org_address,
-            process.census_group_id,
-            auth_fields: auth_fields.presence,
-            two_fa_fields: two_fa_fields.presence
-          )
+        # Pre-flight check that the census's authFields/twoFaFields produce
+        # unique, complete credentials over the group members. In the old API
+        # this took two steps — `POST /organizations/{addr}/groups/{gid}/
+        # validate` then `POST /census/{id}/group/{gid}/publish` — but the new
+        # multi-question API carries the census inline in `POST /processes` and
+        # publishes it as part of `POST /processes/{id}/publish`. The only
+        # thing left to do here is the pre-flight, which is `POST /processes/
+        # census/validation`. Its body accepts the very same census spec
+        # {#census_payload} builds for `POST /processes`, so we hand that in.
+        def ensure_census_validated!
+          @step = "validate_census"
+          client.elections.validate_census(org_address, census_payload)
         rescue Decidim::Elections::Vocdoni::ApiError => e
           # A 400 here is an actionable answer, not a fault — the census is
           # unable to authenticate its own members. Bubble it up so
@@ -212,30 +215,6 @@ module Decidim
           ) if e.status == 400
 
           raise
-        end
-
-        def ensure_census_published!
-          return if process.metadata["census_id"].present?
-
-          @step = "create_census"
-          created = client.census.create(org_address).to_h
-          census_id = created["id"].presence
-          raise Decidim::Elections::Vocdoni::ApiError.new("POST /census returned no id", body: created, transient: false) if census_id.blank?
-
-          @step = "publish_census"
-          published = client.census.publish_group(
-            census_id,
-            process.census_group_id,
-            auth_fields: auth_fields.presence,
-            two_fa_fields: two_fa_fields.presence,
-            weighted: weighted?
-          ).to_h
-
-          size = published["size"].to_i
-          process.update!(
-            census_size: size.positive? ? size : process.census_size,
-            metadata: process.metadata.merge("census_id" => census_id)
-          )
         end
 
         # ---------------------------------------------------------------------

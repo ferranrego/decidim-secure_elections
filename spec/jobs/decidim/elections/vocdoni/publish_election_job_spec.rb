@@ -9,7 +9,7 @@ module Decidim
       subject(:job) { described_class.new }
 
       # Driven through WebMock rather than doubles: the whole point of this job
-      # is the *order* and the *bodies* of eight upstream calls, and a double
+      # is the *order* and the *bodies* of the upstream calls, and a double
       # would happily accept a payload the API rejects.
       let(:api_url) { "https://saas-api.example.org" }
       let(:org_address) { "0x0000000000000000000000000000000000000001" }
@@ -22,7 +22,6 @@ module Decidim
       let(:election) { create(:vocdoni_election, :ready_to_publish, census_members_count: 0, census_group_id: group_id) }
       let(:group_id) { "000000000000000000000001" }
       let(:new_group_id) { "6a677022622d94e7c9a1929a" }
-      let(:census_id) { "6885f0c2c1a4e2f0b1d33b01" }
       let(:process_id) { "6885f0c2c1a4e2f0b1d33a01" }
       let(:publish_job_id) { "6885f1a3c1a4e2f0b1d33a10" }
 
@@ -47,7 +46,7 @@ module Decidim
         { status: 200, body: body.is_a?(String) ? body : body.to_json, headers: json_headers }
       end
 
-      # --- the eight calls of ARCHITECTURE §4c ---------------------------------
+      # --- the calls of ARCHITECTURE §4c ---------------------------------
 
       def stub_add_members(body: vocdoni_fixture("members_added"))
         stub_request(:post, "#{api_url}/organizations/#{org_address}/members").to_return(json_response(body))
@@ -64,18 +63,9 @@ module Decidim
           .to_return(json_response(vocdoni_fixture("group_created")))
       end
 
-      def stub_validate_group(gid = group_id, status: 200, body: "")
-        stub_request(:post, "#{api_url}/organizations/#{org_address}/groups/#{gid}/validate")
+      def stub_validate_census(status: 200, body: "")
+        stub_request(:post, "#{api_url}/processes/census/validation")
           .to_return(status:, body: body.is_a?(String) ? body : body.to_json, headers: body.presence ? json_headers : {})
-      end
-
-      def stub_create_census
-        stub_request(:post, "#{api_url}/census").to_return(json_response(vocdoni_fixture("census_created")))
-      end
-
-      def stub_publish_census(gid = group_id)
-        stub_request(:post, "#{api_url}/census/#{census_id}/group/#{gid}/publish")
-          .to_return(json_response(vocdoni_fixture("census_published")))
       end
 
       def stub_create_process(status: 200, body: vocdoni_fixture("process_created"))
@@ -100,10 +90,12 @@ module Decidim
         stub_request(:get, "#{api_url}/jobs/#{job_id}").to_return(json_response(body))
       end
 
-      # The census part of the sequence for an election that already points at
-      # a member group (nothing to import, nothing to group).
-      def stub_census_sequence(gid = group_id)
-        [stub_validate_group(gid), stub_create_census, stub_publish_census(gid)]
+      # The pre-flight for an election that already points at a member group
+      # (nothing to import, nothing to group). In the multi-question API the
+      # census is inline in `POST /processes` and published as part of the
+      # on-chain publish, so what is left up front is the uniqueness check.
+      def stub_census_sequence(*)
+        [stub_validate_census]
       end
 
       def stub_process_sequence
@@ -147,48 +139,31 @@ module Decidim
       end
 
       describe "a successful publication" do
-        let!(:validate_request) { stub_validate_group }
-        let!(:create_census_request) { stub_create_census }
-        let!(:publish_census_request) { stub_publish_census }
+        let!(:validate_request) { stub_validate_census }
         let!(:create_process_request) { stub_create_process }
         let!(:read_process_request) { stub_read_process }
         let!(:publish_process_request) { stub_publish_process }
         let!(:job_request) { stub_job }
 
-        it "runs the census sequence before anything is written on chain" do
+        it "pre-flights the census before anything is written on chain" do
           job.perform(election.id)
 
           expect(validate_request).to have_been_requested
-          expect(create_census_request).to have_been_requested
-          expect(publish_census_request).to have_been_requested
           expect(create_process_request).to have_been_requested
           expect(publish_process_request).to have_been_requested
           expect(job_request).to have_been_requested
         end
 
-        it "validates the group against the fields the census authenticates on" do
+        it "validates the census against the same spec the process will carry inline" do
           job.perform(election.id)
 
           expect(
-            a_request(:post, "#{api_url}/organizations/#{org_address}/groups/#{group_id}/validate")
-              .with(body: { "authFields" => ["memberNumber"] })
-          ).to have_been_made
-        end
-
-        it "creates the census for the configured organization" do
-          job.perform(election.id)
-
-          expect(
-            a_request(:post, "#{api_url}/census").with(body: { "orgAddress" => org_address })
-          ).to have_been_made
-        end
-
-        it "publishes the census out of the election's member group" do
-          job.perform(election.id)
-
-          expect(
-            a_request(:post, "#{api_url}/census/#{census_id}/group/#{group_id}/publish")
-              .with(body: { "authFields" => ["memberNumber"], "weighted" => false })
+            a_request(:post, "#{api_url}/processes/census/validation").with(
+              body: {
+                "orgAddress" => org_address,
+                "census" => { "authFields" => ["memberNumber"], "groupId" => group_id, "weighted" => false }
+              }
+            )
           ).to have_been_made
         end
 
@@ -374,17 +349,16 @@ module Decidim
           stub_process_sequence
         end
 
-        it "carries the two-factor fields through validation, census and process" do
+        it "carries the two-factor fields through validation and the process inline census" do
           job.perform(election.id)
 
           expect(
-            a_request(:post, "#{api_url}/organizations/#{org_address}/groups/#{group_id}/validate")
-              .with(body: { "authFields" => ["memberNumber"], "twoFaFields" => ["email"] })
-          ).to have_been_made
-
-          expect(
-            a_request(:post, "#{api_url}/census/#{census_id}/group/#{group_id}/publish")
-              .with(body: { "authFields" => ["memberNumber"], "twoFaFields" => ["email"], "weighted" => false })
+            a_request(:post, "#{api_url}/processes/census/validation").with(
+              body: {
+                "orgAddress" => org_address,
+                "census" => { "authFields" => ["memberNumber"], "groupId" => group_id, "weighted" => false, "twoFaFields" => ["email"] }
+              }
+            )
           ).to have_been_made
 
           expect(payload["census"]["twoFaFields"]).to eq(["email"])
@@ -487,18 +461,18 @@ module Decidim
         end
       end
 
-      describe "when the group cannot authenticate its own members" do
+      describe "when the census cannot authenticate its own members" do
         let!(:validate_request) do
-          stub_validate_group(group_id, status: 400, body: vocdoni_fixture("group_validation_failed"))
+          stub_validate_census(status: 400, body: vocdoni_fixture("group_validation_failed"))
         end
 
-        let!(:create_census_request) { stub_create_census }
+        let!(:create_process_request) { stub_create_process }
 
         it "stops before anything is written on chain" do
           job.perform(election.id)
 
           expect(validate_request).to have_been_requested
-          expect(create_census_request).not_to have_been_requested
+          expect(create_process_request).not_to have_been_requested
           expect(election.reload).not_to be_on_chain
         end
 
@@ -517,7 +491,7 @@ module Decidim
           job.perform(election.id)
 
           error = election.reload.last_error
-          expect(error["step"]).to eq("validate_group")
+          expect(error["step"]).to eq("validate_census")
           expect(error["code"]).to eq(40_037)
           expect(error["details"]["missingData"]).to eq(%w(6a677022622d94e7c9a19301 6a677022622d94e7c9a19302))
         end
@@ -562,10 +536,10 @@ module Decidim
             stub_job
           end
 
-          it "resumes without rebuilding the census or creating a second process" do
+          it "resumes without re-validating the census or creating a second process" do
             job.perform(election.id)
 
-            expect(a_request(:post, "#{api_url}/census")).not_to have_been_made
+            expect(a_request(:post, "#{api_url}/processes/census/validation")).not_to have_been_made
             expect(a_request(:post, "#{api_url}/processes")).not_to have_been_made
             expect(election.reload.status).to eq("ready")
           end
