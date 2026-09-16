@@ -24,8 +24,6 @@ en:
             national_id: "National ID"
             name: "Full name"
             date_of_birth: "Date of birth"
-          weighted_votes: "Weighted votes"
-          weighted_votes_help: "Assign each voter a weight (default 1). Requires a per-voter weight column when the census is populated."
       admin:
         elections:
           dashboard:

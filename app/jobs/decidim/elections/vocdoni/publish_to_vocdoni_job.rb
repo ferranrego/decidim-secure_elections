@@ -398,8 +398,7 @@ module Decidim
         def census_payload
           payload = {
             "authFields" => auth_fields,
-            "groupId" => process.census_group_id,
-            "weighted" => weighted?
+            "groupId" => process.census_group_id
           }
           payload["twoFaFields"] = two_fa_fields if two_fa_fields.any?
           payload
@@ -470,10 +469,6 @@ module Decidim
 
         def two_fa_fields
           credential_field_selection.filter_map { |f| TWO_FA_FIELD_MAP[f] }
-        end
-
-        def weighted?
-          election.census_settings["weighted_votes"] == true
         end
 
         def org_address

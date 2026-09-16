@@ -12,7 +12,7 @@ module Decidim
         # up and persists into `election.census_settings` (a jsonb column on
         # `decidim_elections_elections`). The form fields themselves stay
         # backend-agnostic — a Vocdoni backend collects a set of identifier
-        # fields from voters and optionally makes the ballot weighted.
+        # fields from voters.
         class CensusForm < Decidim::Form
           mimic :census
           include Decidim::AttributeObject::TypeMap
@@ -23,7 +23,6 @@ module Decidim
           CREDENTIAL_FIELDS = %w(email phone member_number national_id name date_of_birth).freeze
 
           attribute :credential_fields, Array[String], default: []
-          attribute :weighted_votes, Boolean, default: false
 
           validate :at_least_one_credential_field
           validates :credential_fields, inclusion: { in: CREDENTIAL_FIELDS }, allow_blank: true
@@ -53,8 +52,7 @@ module Decidim
           # on subsequent edits rebuilds the same field selections.
           def census_settings
             {
-              "credential_fields" => credential_fields.map(&:to_s),
-              "weighted_votes" => weighted_votes
+              "credential_fields" => credential_fields.map(&:to_s)
             }
           end
 
