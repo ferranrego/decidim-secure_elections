@@ -21,6 +21,8 @@
   because that IS the review the admin needs.
 %>
 <% vocdoni_backed = election.census_manifest.to_s == "vocdoni_secure" %>
+<% vocdoni_process = vocdoni_backed ? election.vocdoni_process : nil %>
+<% vocdoni_census_valid = vocdoni_process&.census_valid? %>
 <% add_decidim_page_title(t(".title")) %>
 <% append_javascript_pack_tag "decidim_elections_admin" %>
 <% append_stylesheet_pack_tag "decidim_elections_admin" %>
@@ -50,6 +52,24 @@
       <div class="callout callout--warning mb-4" role="note">
         <p><%= t("decidim.elections.admin.elections.dashboard.vocdoni_subtitle_html").html_safe %></p>
       </div>
+      <% if vocdoni_process&.census_validation.present? && !vocdoni_census_valid %>
+        <div class="callout alert mb-4" role="alert">
+          <p class="font-semibold">
+            <%= t("decidim.elections.admin.elections.dashboard.vocdoni_census_invalid_title") %>
+          </p>
+          <p class="text-sm mt-1">
+            <%= t("decidim.elections.admin.elections.dashboard.vocdoni_census_invalid_body_html",
+                  census_url: election_census_path(election)).html_safe %>
+          </p>
+          <%= render partial: "decidim/elections/vocdoni/admin/censuses/vocdoni_secure_validation",
+                     locals: { validation: vocdoni_process.census_validation } %>
+        </div>
+      <% elsif !vocdoni_census_valid %>
+        <div class="callout warning mb-4" role="note">
+          <p><%= t("decidim.elections.admin.elections.dashboard.vocdoni_census_pending_html",
+                    census_url: election_census_path(election)).html_safe %></p>
+        </div>
+      <% end %>
     <% else %>
       <p class="mb-4"><%= t(".subtitle") %></p>
     <% end %>
@@ -65,13 +85,29 @@
         <%
           confirm_key = vocdoni_backed ? "publish_confirm_vocdoni" : "publish_confirm"
           confirm_scope = vocdoni_backed ? "decidim.elections.admin.elections.dashboard" : "decidim.elections.admin.dashboard"
+          # Vocdoni-backed elections are gated on the pre-flight recorded by
+          # AfterUpdateCensus. Anything other than `ok:true` — a failed
+          # pre-flight, or none run yet — disables the Publish action rather
+          # than letting the admin fire the job and get a silent SaaS 400.
+          publish_disabled = vocdoni_backed && !vocdoni_census_valid
+          disabled_title = publish_disabled ? t("decidim.elections.admin.elections.dashboard.vocdoni_publish_disabled_title") : nil
         %>
-        <%= link_to publish_election_path(election),
-                    method: :put,
-                    class: "button button__sm button__secondary",
-                    data: { confirm: t(confirm_key, scope: confirm_scope) } do %>
-                    <%= icon "check-line" %>
-                    <%= t("publish", scope: "decidim.elections.admin.elections.form") %>
+        <% if publish_disabled %>
+          <button type="button"
+                  class="button button__sm button__secondary is-disabled"
+                  disabled
+                  title="<%= disabled_title %>">
+            <%= icon "check-line" %>
+            <%= t("publish", scope: "decidim.elections.admin.elections.form") %>
+          </button>
+        <% else %>
+          <%= link_to publish_election_path(election),
+                      method: :put,
+                      class: "button button__sm button__secondary",
+                      data: { confirm: t(confirm_key, scope: confirm_scope) } do %>
+                      <%= icon "check-line" %>
+                      <%= t("publish", scope: "decidim.elections.admin.elections.form") %>
+          <% end %>
         <% end %>
       <% end %>
     </div>

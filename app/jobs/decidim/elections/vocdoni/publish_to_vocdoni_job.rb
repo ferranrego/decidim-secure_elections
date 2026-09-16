@@ -67,23 +67,14 @@ module Decidim
         }.freeze
 
         def perform(election_id)
-          # ApplicationJob is Decidim's; it exposes `election` via
-          # `attr_reader :election` in the base class, but that reader is
-          # protected and shared. Rebind our local ivar here.
-          @election = Decidim::Elections::Election.find_by(id: election_id)
-          return if election.blank?
-          return unless vocdoni_backed?
-
-          @process = election.vocdoni_process || Process.create!(decidim_election_id: election.id, state: "pending")
+          return unless bootstrap!(election_id)
           return if published_upstream?
 
           Decidim::Elections::Vocdoni.validate_configuration!
 
           process.update!(state: "publishing")
 
-          ensure_members_pushed!
-          ensure_group_created!
-          ensure_census_validated!
+          prepare_census!
           ensure_process_created!
           ensure_process_published!
           persist_process_metadata!
@@ -95,15 +86,34 @@ module Decidim
           # while the process is still ongoing.
           Decidim::Elections::Vocdoni::SyncProcessJob.perform_later(election.id)
         rescue Decidim::Elections::Vocdoni::ApiError => e
-          process.record_failure!(redact(e.message), step: @step)
+          record_step_failure!(e)
           # If a process id was already saved, the SaaS may still confirm it
           # asynchronously — keep the monitor polling.
           Decidim::Elections::Vocdoni::SyncProcessJob.perform_later(election.id) if process.vocdoni_process_id.present?
           raise if e.transient?
         rescue StandardError => e
-          process.record_failure!(redact(e.message), step: @step)
+          record_step_failure!(e)
           Decidim::Elections::Vocdoni::SyncProcessJob.perform_later(election.id) if process.vocdoni_process_id.present?
           raise
+        end
+
+        # Runs only the census-preparation phase — push members, create the
+        # group, validate — and records the outcome in
+        # `process.metadata["census_validation"]`. Used by
+        # {Admin::AfterUpdateCensus} so the Census tab reflects a real
+        # dry-run status before the admin ever clicks Publish, and by the
+        # Dashboard to gate that Publish button (the guard reads
+        # `process.census_valid?`).
+        #
+        # Idempotent by construction: `ensure_members_pushed!` and
+        # `ensure_group_created!` skip work that a previous attempt (or the
+        # full publish) already did, so calling this at every census save is
+        # cheap after the first time.
+        #
+        # Never raises: a validation failure is an *answer* the admin needs to
+        # see, not a job crash. Everything is captured on the process record.
+        def self.preview_census!(election_id)
+          new.send(:run_preview!, election_id)
         end
 
         private
@@ -116,6 +126,89 @@ module Decidim
 
         def published_upstream?
           process.vocdoni_process_id.present? && process.published?
+        end
+
+        # Common setup for both `perform` and `preview_census!`. Returns true
+        # when there is something to do, false when the election is missing
+        # or not Vocdoni-backed. Rebinds `@election` because `ApplicationJob`'s
+        # own `attr_reader :election` is protected and shared across attempts.
+        def bootstrap!(election_id)
+          @election = Decidim::Elections::Election.find_by(id: election_id)
+          return false if election.blank?
+          return false unless vocdoni_backed?
+
+          @process = election.vocdoni_process || Process.create!(decidim_election_id: election.id, state: "pending")
+          true
+        end
+
+        # The three steps that reach the point where we can *tell* whether the
+        # census works: push members, create the group, validate. Extracted
+        # so the preview path and the full publish path share the exact same
+        # code — anything that succeeds here will also succeed on Publish.
+        # On success, records `ok: true` on the process so the Dashboard's
+        # Publish gate can unblock.
+        def prepare_census!
+          ensure_members_pushed!
+          ensure_group_created!
+          ensure_census_validated!
+          process.record_census_validation!(ok: true, size: census_users.size)
+        end
+
+        # Ran by `preview_census!`. Catches errors and records them; never
+        # raises — the admin sees the result on the next page render.
+        def run_preview!(election_id)
+          return unless bootstrap!(election_id)
+          return if published_upstream?
+
+          Decidim::Elections::Vocdoni.validate_configuration!
+
+          prepare_census!
+        rescue Decidim::Elections::Vocdoni::ApiError => e
+          record_preview_failure!(e)
+        rescue StandardError => e
+          record_preview_failure!(e)
+        end
+
+        # Called from both rescue arms of `perform`. Persists the failure
+        # against the process (state: failed, last_error) AND, when the step
+        # that blew up was the census pre-flight, mirrors the payload into
+        # `census_validation` so the same Dashboard gate that reads a preview
+        # ok=false also reads a publish-time ok=false.
+        def record_step_failure!(error)
+          message = redact(error.message)
+          body_data = error.respond_to?(:body) ? error.try(:body)&.dig("data") : nil
+          error_code = error.respond_to?(:code) ? error.try(:code) : nil
+
+          process.record_failure!(message, step: @step, code: error_code, data: body_data)
+
+          return unless @step == "validate_census"
+
+          process.record_census_validation!(
+            ok: false,
+            step: @step,
+            code: error_code,
+            message: message,
+            data: body_data
+          )
+        end
+
+        # Mirror of `record_step_failure!` for the preview path — same
+        # `census_validation` shape, no state change. A preview failure at
+        # any step (add_members, create_group, validate_census) is still an
+        # actionable answer for the admin, so we surface it under the same
+        # metadata key.
+        def record_preview_failure!(error)
+          message = redact(error.message)
+          body_data = error.respond_to?(:body) ? error.try(:body)&.dig("data") : nil
+          error_code = error.respond_to?(:code) ? error.try(:code) : nil
+
+          process.record_census_validation!(
+            ok: false,
+            step: @step,
+            code: error_code,
+            message: message,
+            data: body_data
+          )
         end
 
         # ---------------------------------------------------------------------

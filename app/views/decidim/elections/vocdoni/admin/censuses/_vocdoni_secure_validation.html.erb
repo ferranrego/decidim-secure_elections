@@ -1,0 +1,62 @@
+<%#
+  Renders the outcome of the last census pre-flight against Vocdoni's SaaS.
+
+  Populated by PublishToVocdoniJob.preview_census! via AfterUpdateCensus,
+  and by the full PublishToVocdoniJob when a real publish fails at the
+  same step. Two shapes:
+
+    ok:true  → members push + group create + validate all passed.
+                Includes `size:` (roster count) so the admin sees exactly
+                how many voters the on-chain census will hold.
+
+    ok:false → validation refused the current auth-field combination, OR
+                an earlier prep step blew up (empty roster, memberbase
+                push rejected, group create). `step:`, `message:` and,
+                when the SaaS returned it, `data.{duplicates, missingData,
+                notFound}` name the actual member ids so the admin can
+                fix the roster or the auth pick.
+
+  Locals: `validation` — the `metadata["census_validation"]` hash.
+%>
+<%
+  callout = validation["ok"] ? "success" : "alert"
+  data = validation["data"].to_h
+  dups = Array(data["duplicates"]).map(&:to_s)
+  missing = Array(data["missingData"]).map(&:to_s)
+  not_found = Array(data["notFound"]).map(&:to_s)
+%>
+<div class="callout <%= callout %>" role="status">
+  <% if validation["ok"] %>
+    <p class="font-semibold">
+      <%= t("decidim.elections.censuses.vocdoni_secure.validation.ok_title", count: validation["size"].to_i) %>
+    </p>
+    <p class="text-sm">
+      <%= t("decidim.elections.censuses.vocdoni_secure.validation.ok_body") %>
+    </p>
+  <% else %>
+    <p class="font-semibold">
+      <%= t("decidim.elections.censuses.vocdoni_secure.validation.error_title") %>
+    </p>
+    <% if validation["message"].present? %>
+      <p class="text-sm mt-1"><%= validation["message"] %></p>
+    <% end %>
+    <% if dups.any? %>
+      <p class="text-sm mt-2">
+        <strong><%= t("decidim.elections.censuses.vocdoni_secure.validation.duplicates", count: dups.size) %>:</strong>
+        <%= dups.first(20).join(", ") %><%= "…" if dups.size > 20 %>
+      </p>
+    <% end %>
+    <% if missing.any? %>
+      <p class="text-sm mt-2">
+        <strong><%= t("decidim.elections.censuses.vocdoni_secure.validation.missing_data", count: missing.size) %>:</strong>
+        <%= missing.first(20).join(", ") %><%= "…" if missing.size > 20 %>
+      </p>
+    <% end %>
+    <% if not_found.any? %>
+      <p class="text-sm mt-2">
+        <strong><%= t("decidim.elections.censuses.vocdoni_secure.validation.not_found", count: not_found.size) %>:</strong>
+        <%= not_found.first(20).join(", ") %><%= "…" if not_found.size > 20 %>
+      </p>
+    <% end %>
+  <% end %>
+</div>

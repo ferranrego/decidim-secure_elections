@@ -103,17 +103,69 @@ module Decidim
 
         # Records the last non-transient publish failure. Used by the dashboard
         # to surface something actionable instead of a stuck wizard.
-        def record_failure!(message, step: nil)
+        #
+        # `data` keeps the SaaS's structured error payload — the `duplicates`,
+        # `missingData` and `notFound` lists from a census validation 400 —
+        # so the admin sees *which* voters are the problem, not just "invalid
+        # data provided".
+        def record_failure!(message, step: nil, code: nil, data: nil)
           self.metadata = metadata.merge(
             "last_error" => {
               "message" => message.to_s,
               "step" => step.presence&.to_s,
+              "code" => code,
+              "data" => data.presence,
               "at" => Time.current.iso8601
             }.compact
           )
           self.last_error = message.to_s.truncate(255)
           self.state = "failed"
           save!
+        end
+
+        # The last census pre-flight — populated by `AfterUpdateCensus` (which
+        # runs `PublishToVocdoniJob.preview_census!` on every save of the
+        # Census tab) and read by the Dashboard to gate the Publish button.
+        # `ok: true` means the current auth-field selection produces unique,
+        # complete credentials over the current roster. Any other value —
+        # `false`, or the key absent — blocks Publish.
+        #
+        # Kept as a plain metadata hash rather than as its own column so
+        # future variants (per-step timings, warnings) do not need a
+        # migration.
+        def record_census_validation!(ok:, size: nil, step: nil, code: nil, message: nil, data: nil)
+          self.metadata = metadata.merge(
+            "census_validation" => {
+              "ok" => ok,
+              "at" => Time.current.iso8601,
+              "size" => size,
+              "step" => step.presence&.to_s,
+              "code" => code,
+              "message" => message.presence&.to_s,
+              "data" => data.presence
+            }.compact
+          )
+          save!
+        end
+
+        # Drops the recorded validation. Called from `AfterUpdateCensus` at
+        # the *start* of a save so a slow validation cannot leave a stale
+        # `ok: true` visible while the new preflight is still running.
+        def invalidate_census_validation!
+          return unless metadata.key?("census_validation")
+
+          new_meta = metadata.dup
+          new_meta.delete("census_validation")
+          self.metadata = new_meta
+          save!
+        end
+
+        def census_validation
+          metadata["census_validation"]
+        end
+
+        def census_valid?
+          census_validation.is_a?(Hash) && census_validation["ok"] == true
         end
       end
     end
