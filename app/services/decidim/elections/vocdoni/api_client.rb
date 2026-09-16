@@ -339,13 +339,33 @@ module Decidim
       # @param body [Object] the parsed response body
       # @return [String]
       def error_message(response, body)
-        detail = body.is_a?(Hash) ? (body["error"].presence || body["message"].presence) : body.presence
+        parsed = body.is_a?(Hash) ? body : parse_error_json(body)
+        detail =
+          if parsed.is_a?(Hash)
+            parsed["error"].presence || parsed["message"].presence
+          else
+            body.presence
+          end
         code = error_code(body)
 
         message = "Vocdoni API #{response.env.method.to_s.upcase} #{response.env.url} failed with HTTP #{response.status}"
         message << " (code #{code})" if code
         message << ": #{detail}" if detail.present?
         message
+      end
+
+      # Faraday's json middleware only parses when `Content-Type` matches
+      # `/\bjson$/`, so `application/json; charset=utf-8` (or a proxy that
+      # appended a suffix) drops the body through as raw JSON. Fall back to
+      # a manual parse before deriving the message, so `error_message`
+      # renders the SaaS's own short `"error"` field rather than dumping the
+      # whole JSON blob into an alert.
+      def parse_error_json(body)
+        return nil unless body.is_a?(String)
+
+        JSON.parse(body)
+      rescue JSON::ParserError
+        nil
       end
     end
   end
