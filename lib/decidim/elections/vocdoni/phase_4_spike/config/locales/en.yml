@@ -2,8 +2,19 @@ en:
   decidim:
     elections:
       censuses:
+        # Per-manifest override of the upstream `census_size_html`. The
+        # upstream copy ends with "(this might change on a dynamic census)",
+        # which is true for `internal_users` — new authorizations grant more
+        # eligibility during the voting window — but wrong here: the Vocdoni
+        # census is anchored on-chain at publish, so the roster is frozen
+        # from that moment on and cannot grow. The override is looked up by
+        # `admin/census/_preview.html.erb` (see our engine's copy of that
+        # partial) when `election.census_manifest == "vocdoni_secure"`.
         vocdoni_secure:
-          label: "Secure via Vocdoni"
+          label: "Registered participants (snapshot, using Vocdoni blockchain)"
+          census_size_html:
+            one: There is currently <strong>1</strong> person eligible for voting in this election (frozen at publish — the census is a snapshot).
+            other: There are currently <strong>%{count}</strong> people eligible for voting in this election (frozen at publish — the census is a snapshot).
           credentials_title: "Voter authentication"
           credentials_info: "Pick which identifier fields voters authenticate with. Each ballot is signed and verified in the browser; the Decidim server never sees a vote."
           credential_fields:
