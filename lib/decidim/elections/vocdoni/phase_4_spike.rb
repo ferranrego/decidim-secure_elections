@@ -108,6 +108,14 @@ module Decidim
         #     hide the tab on internal_users elections without touching the
         #     upstream item list.
         initializer "phase_4_spike.security_tab" do
+          # Decidim raises unless every icon referenced by name is
+          # pre-registered (`Decidim::IconRegistry#find`).
+          Decidim.icons.register(name: "shield-keyhole-line",
+                                 icon: "shield-keyhole-line",
+                                 category: "system",
+                                 description: "Security tab",
+                                 engine: :core)
+
           Decidim::Elections::AdminEngine.routes.append do
             resources :elections, only: [] do
               resource :security, only: [:show, :update],
