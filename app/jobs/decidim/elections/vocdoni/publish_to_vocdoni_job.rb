@@ -49,7 +49,7 @@ module Decidim
         # `:vocdoni_secure` `user_query`. Keeps publish + memberbase upload
         # fast against the stg SaaS. Real deployments will replace this
         # inline query with a proper roster picked from the admin form.
-        DEMO_ROSTER_LIMIT = 500
+        DEMO_ROSTER_LIMIT = 20
 
         def perform(election_id)
           return unless bootstrap!(election_id)
