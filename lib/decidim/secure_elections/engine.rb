@@ -3,6 +3,7 @@
 require "rails"
 require "active_support/all"
 require "decidim/core"
+require_relative "dev_login_prefill_middleware"
 
 module Decidim
   module SecureElections
@@ -41,6 +42,15 @@ module Decidim
         end
 
         root to: "elections#index"
+      end
+
+      # Pre-fill the Devise sign-in form with the default seeded admin
+      # credentials in dev, matching `try.decidim.org`. Gated on env so
+      # credentials never appear on a non-dev boot.
+      initializer "decidim_secure_elections.dev_login_prefill" do |app|
+        if Rails.env.development?
+          app.middleware.use Decidim::SecureElections::DevLoginPrefillMiddleware
+        end
       end
 
       initializer "decidim_secure_elections.add_cells_view_paths" do
