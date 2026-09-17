@@ -104,15 +104,18 @@ module Decidim
             election = @election
             proxy = election ? Decidim::EngineRouter.admin_proxy(election.component) : nil
             security_path = proxy&.election_security_path(election)
-            # Mirror upstream's Questions/Census tabs: the item is always
-            # rendered so an admin sees the full wizard shape from the
-            # first step, but the link is a `"#"` span until the election
-            # exists and stays that way once the election is no longer
-            # editable — Decidim's tab CSS grays out a "#" item. Position
-            # 3.5 slots it between Census (3) and Dashboard (4) regardless
-            # of future upstream additions at either end — Decidim::Menu
-            # sorts items by float position.
-            enabled = election.present? && election.editable?
+            # Mirror upstream's Questions/Census/Dashboard tabs: the item is
+            # always rendered so an admin sees the full wizard shape from
+            # the first step, but the link is a `"#"` span until the wizard
+            # has reached this step — Decidim's tab CSS grays out a "#"
+            # item. Security sits after Census, so it stays grayed until
+            # `census_ready?` (same signal upstream uses to gate Dashboard),
+            # and it grays back out once the election is no longer editable
+            # so it matches Questions/Census post-publish. Position 3.5
+            # slots it between Census (3) and Dashboard (4) regardless of
+            # future upstream additions at either end — Decidim::Menu sorts
+            # items by float position.
+            enabled = election.present? && election.editable? && election.census_ready?
             menu.add_item :vocdoni_security,
                           I18n.t("security", scope: "decidim.admin.menu.elections_menu"),
                           enabled ? security_path : "#",
