@@ -184,6 +184,10 @@ module Decidim
 
         attr_reader :status, :code, :body
 
+        # @param message [String] human-readable summary passed up to the caller.
+        # @param status [Integer, nil] HTTP status the SaaS returned.
+        # @param code [String, nil] machine code from the SaaS response body.
+        # @param body [Hash, nil] the parsed response body, kept for diagnostics.
         # @param transient [Boolean, nil] override the inferred verdict. Pass
         #   `false` when the call succeeded at the HTTP level but the *body* is
         #   a permanent rejection (a 2xx that reports `errors` in the payload).

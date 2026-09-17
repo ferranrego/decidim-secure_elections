@@ -38,15 +38,18 @@ module Decidim
         # SaaS draft still hanging around.
         before_destroy :delete_upstream_draft, if: :upstream_draft?
 
-        scope :pending,    -> { where(state: "pending") }
+        scope :pending, -> { where(state: "pending") }
         scope :publishing, -> { where(state: "publishing") }
-        scope :published,  -> { where(state: "published") }
-        scope :failed,     -> { where(state: "failed") }
+        scope :published, -> { where(state: "published") }
+        scope :failed, -> { where(state: "failed") }
 
-        def pending?    = state == "pending"
+        def pending? = state == "pending"
+
         def publishing? = state == "publishing"
-        def published?  = state == "published"
-        def failed?     = state == "failed"
+
+        def published? = state == "published"
+
+        def failed? = state == "failed"
 
         # Per-question upstream ids and chain-side statuses. Written by
         # PublishToVocdoniJob after the process is on chain; read by the voter
@@ -96,7 +99,7 @@ module Decidim
         def delete_upstream_draft
           Decidim::Elections::Vocdoni::ApiClient.new.elections.delete(vocdoni_process_id)
         rescue Decidim::Elections::Vocdoni::ApiError => e
-          return if e.status == 404 || e.code == 40012
+          return if e.status == 404 || e.code == 40_012
 
           raise
         end
@@ -136,6 +139,7 @@ module Decidim
         # Kept as a plain metadata hash rather than as its own column so
         # future variants (per-step timings, warnings) do not need a
         # migration.
+        # rubocop:disable Naming/MethodParameterName, Metrics/ParameterLists -- `ok` is the payload shape and six keyword args mirror it
         def record_census_validation!(ok:, size: nil, step: nil, code: nil, message: nil, data: nil)
           self.metadata = metadata.merge(
             "census_validation" => {
@@ -150,11 +154,12 @@ module Decidim
           )
           save!
         end
+        # rubocop:enable Naming/MethodParameterName, Metrics/ParameterLists
 
         # Drops the recorded validation. Legacy hook, retained for callers
         # that may still want to invalidate before a re-run.
         def invalidate_census_validation!
-          return unless metadata.key?("census_validation")
+          return unless metadata.has_key?("census_validation")
 
           new_meta = metadata.dup
           new_meta.delete("census_validation")

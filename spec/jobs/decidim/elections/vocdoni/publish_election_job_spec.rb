@@ -277,7 +277,7 @@ module Decidim
           it "requests an interruptible process so the admin can pause it again" do
             # The SaaS no longer forces `interruptible` on a paused publish
             # (vocdoni/saas-backend#668), so this has to be sent explicitly.
-            expect(payload["interruptible"]).to eq(true)
+            expect(payload["interruptible"]).to be(true)
           end
 
           it "omits startDate: a manual-start election opens on the admin's action" do
@@ -457,7 +457,7 @@ module Decidim
 
             expect(create_group_request).not_to have_been_requested
             expect(election.reload.status).to eq("draft")
-            expect(election.last_error_message).to match(/rejected 1 of 2 voters/)
+            expect(election.last_error_message).to include("rejected 1 of 2 voters")
           end
         end
 

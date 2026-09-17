@@ -31,8 +31,8 @@ module Decidim
             response.close if response.respond_to?(:close)
 
             body.sub!("</body>", "#{@snippet}</body>") if body.include?("</body>")
-            headers["Content-Length"] = body.bytesize.to_s if headers.key?("Content-Length")
-            headers["content-length"] = body.bytesize.to_s if headers.key?("content-length")
+            headers["Content-Length"] = body.bytesize.to_s if headers.has_key?("Content-Length")
+            headers["content-length"] = body.bytesize.to_s if headers.has_key?("content-length")
 
             [status, headers, [body]]
           end

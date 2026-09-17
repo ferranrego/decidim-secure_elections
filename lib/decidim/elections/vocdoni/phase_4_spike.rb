@@ -30,9 +30,7 @@ module Decidim
           # ever booted in dev-mode dev_apps, but we still gate on env to be
           # explicit — never inject credentials on a non-dev boot.
           initializer "phase_4_spike.dev_login_prefill" do |app|
-            if Rails.env.development?
-              app.middleware.use Decidim::Elections::Vocdoni::Phase4Spike::DevLoginPrefillMiddleware
-            end
+            app.middleware.use Decidim::Elections::Vocdoni::Phase4Spike::DevLoginPrefillMiddleware if Rails.env.development?
           end
 
           # Decorate upstream `Decidim::Elections::Election` with two spike-

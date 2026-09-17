@@ -20,14 +20,20 @@ module Decidim
         extend ActiveSupport::Concern
 
         included do
+          # rubocop:disable Rails/LexicallyScopedActionFilter -- prepended onto
+          # upstream's `CensusController#update`, which is where `:update` is
+          # actually defined.
           after_action :route_census_save_through_security, only: :update
+          # rubocop:enable Rails/LexicallyScopedActionFilter
         end
 
         private
 
         def route_census_save_through_security
           return unless response.redirect?
-          return unless (location = response.headers["Location"]).present?
+
+          location = response.headers["Location"]
+          return if location.blank?
           return unless location.include?("/dashboard")
 
           response.headers["Location"] = location.sub(%r{/dashboard(\z|\?)}, '/security\1')

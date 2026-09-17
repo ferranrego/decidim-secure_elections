@@ -25,6 +25,14 @@ Metrics/BlockLength:
 # name the same gems. `disable-next-line` would only cover the `if`
 # line and leave the else branch flagged, so the block-scoped
 # disable/enable pair stays as the least-noisy option.
+#
+# `process.rb` wraps `record_census_validation!` in a disable pair for
+# `Naming/MethodParameterName` + `Metrics/ParameterLists`: the six
+# keyword args mirror the SaaS census-validation payload one-for-one,
+# and `ok:` is the payload's own key. A trailing directive would blow
+# past the line-length limit; splitting the args into a hash would hide
+# what is a deliberate 1:1 shape.
 Style/DirectiveScope:
   Exclude:
     - "Gemfile"
+    - "app/models/decidim/elections/vocdoni/process.rb"

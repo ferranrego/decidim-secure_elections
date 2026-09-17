@@ -53,7 +53,7 @@ module Decidim
           private
 
           def election
-            @election ||= ::Decidim::Elections::Election.where(component: current_component).find(params[:election_id])
+            @election ||= ::Decidim::Elections::Election.where(component: current_component).find(params.expect(:election_id))
           end
 
           def security_form

@@ -119,7 +119,13 @@ module Decidim
           return nil unless error.respond_to?(:body)
 
           body = error.try(:body)
-          body = (JSON.parse(body) rescue nil) if body.is_a?(String)
+          if body.is_a?(String)
+            body = begin
+              JSON.parse(body)
+            rescue StandardError
+              nil
+            end
+          end
           return nil unless body.is_a?(Hash)
 
           body["data"]
@@ -156,10 +162,8 @@ module Decidim
           # on the (censusId, loginHash) unique index because the clones all
           # hash to the same auth-field value. Filter by what is already there.
           existing = upstream_member_index
-          fresh = payloads.reject { |p| existing.key?("memberNumber:#{p["memberNumber"].to_s.strip.downcase}") }
-          if fresh.empty?
-            return
-          end
+          fresh = payloads.reject { |p| existing.has_key?("memberNumber:#{p["memberNumber"].to_s.strip.downcase}") }
+          return if fresh.empty?
 
           response = client.organizations.add_members(org_address, fresh).to_h
           await_job!(response["jobId"])
@@ -208,13 +212,15 @@ module Decidim
           @step = "validate_census"
           client.elections.validate_census(org_address, census_payload)
         rescue Decidim::Elections::Vocdoni::ApiError => e
-          raise Decidim::Elections::Vocdoni::ApiError.new(
-            e.message.to_s,
-            body: e.try(:body),
-            status: e.try(:status),
-            code: e.try(:code),
-            transient: false
-          ) if e.status == 400
+          if e.status == 400
+            raise Decidim::Elections::Vocdoni::ApiError.new(
+              e.message.to_s,
+              body: e.try(:body),
+              status: e.try(:status),
+              code: e.try(:code),
+              transient: false
+            )
+          end
 
           raise
         end
@@ -256,7 +262,7 @@ module Decidim
               "decidim_question_id" => question.id,
               "vocdoni_question_id" => (upstream["id"] || upstream["questionId"]).to_s.presence,
               "vocdoni_upstream_id" => upstream["upstreamId"].to_s.presence,
-              "vocdoni_status"      => upstream["status"].to_s.presence
+              "vocdoni_status" => upstream["status"].to_s.presence
             }
           end.compact
 
@@ -279,7 +285,7 @@ module Decidim
           %w(READY ONGOING ENDED RESULTS PAUSED).include?(remote["status"].to_s)
         end
 
-        def remote_question_for(remote, question, index)
+        def remote_question_for(remote, _question, index)
           questions = Array(remote["questions"])
           return nil if questions.empty?
 
@@ -343,7 +349,7 @@ module Decidim
         # the memberbase) and resolve_member_ids! (which reads it to look up
         # ids for the group) share one walk. Callers that add members must
         # invalidate `@upstream_member_index` so the next read rewalks.
-        def upstream_member_index
+        def upstream_member_index # rubocop:disable Metrics/CyclomaticComplexity -- one method walking the whole paginated list; splitting it would spread the pagination loop across helpers for no clarity gain
           return @upstream_member_index if @upstream_member_index
 
           index = {}
@@ -409,7 +415,7 @@ module Decidim
         # accepts lowercase `singlechoice` / `multichoice` and rejects
         # anything else with code 40037.
         QUESTION_TYPE_MAP = {
-          "single_option"   => "singlechoice",
+          "single_option" => "singlechoice",
           "multiple_option" => "multichoice"
         }.freeze
 

@@ -25,8 +25,8 @@ module Decidim
         #   ended / results      → done, no rescheduling
         DEFAULT_CADENCE_S = {
           "publishing" => 30,
-          "ongoing"    => 300,
-          "paused"     => 300
+          "ongoing" => 300,
+          "paused" => 300
         }.freeze
 
         def perform(election_id)
@@ -100,7 +100,7 @@ module Decidim
               "decidim_question_id" => local&.id,
               "vocdoni_question_id" => (upstream["id"] || upstream["questionId"]).to_s.presence,
               "vocdoni_upstream_id" => upstream["upstreamId"].to_s.presence,
-              "vocdoni_status"      => upstream["status"].to_s.presence
+              "vocdoni_status" => upstream["status"].to_s.presence
             }
           end
         end
