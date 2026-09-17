@@ -10,6 +10,7 @@
 # unaffected.
 
 require "decidim/elections"
+require_relative "phase_4_spike/dev_login_prefill_middleware"
 
 module Decidim
   module Elections
@@ -21,6 +22,16 @@ module Decidim
         # Views + locales live under the spike's own path so nothing collides
         # with the main engine.
         paths["config/locales"] = "lib/decidim/elections/vocdoni/phase_4_spike/config/locales"
+
+        # Pre-fill the Devise sign-in form with the default seeded admin
+        # credentials in dev, matching `try.decidim.org`. This spike is only
+        # ever booted in dev-mode dev_apps, but we still gate on env to be
+        # explicit — never inject credentials on a non-dev boot.
+        initializer "phase_4_spike.dev_login_prefill" do |app|
+          if Rails.env.development?
+            app.middleware.use Decidim::Elections::Vocdoni::Phase4Spike::DevLoginPrefillMiddleware
+          end
+        end
 
         # Registers the "Secure via Vocdoni" census manifest — the ONE thing
         # an admin picks. Everything else that makes an election "Vocdoni-
