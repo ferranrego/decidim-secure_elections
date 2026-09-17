@@ -3,51 +3,51 @@
 module Decidim
   module Elections
     module Vocdoni
-    # Metadata shown on every election card: the lifecycle badge, the calendar
-    # progress and the number of votes cast so far.
-    class ElectionCardMetadataCell < Decidim::CardMetadataCell
-      include Decidim::LayoutHelper
-      include ActionView::Helpers::DateHelper
+      # Metadata shown on every election card: the lifecycle badge, the calendar
+      # progress and the number of votes cast so far.
+      class ElectionCardMetadataCell < Decidim::CardMetadataCell
+        include Decidim::LayoutHelper
+        include ActionView::Helpers::DateHelper
 
-      alias election model
+        alias election model
 
-      def initialize(*)
-        super
+        def initialize(*)
+          super
 
-        @items.prepend(*election_items)
-      end
+          @items.prepend(*election_items)
+        end
 
-      private
+        private
 
-      def election_items
-        [status_item, progress_item, votes_item].compact
-      end
+        def election_items
+          [status_item, progress_item, votes_item].compact
+        end
 
-      def status_item
-        { cell: "decidim/elections/vocdoni/election_status", args: [election] }
-      end
+        def status_item
+          { cell: "decidim/elections/vocdoni/election_status", args: [election] }
+        end
 
-      def votes_item
-        return if election.votes_count.to_i.zero?
+        def votes_item
+          return if election.votes_count.to_i.zero?
 
-        {
-          text: t("votes_count", scope: "decidim.elections.vocdoni.elections.results", count: election.votes_count),
-          icon: "check-double-line"
-        }
-      end
+          {
+            text: t("votes_count", scope: "decidim.elections.vocdoni.elections.results", count: election.votes_count),
+            icon: "check-double-line"
+          }
+        end
 
-      def start_date
-        election.start_at&.to_time
-      end
+        def start_date
+          election.start_at&.to_time
+        end
 
-      def end_date
-        election.end_at&.to_time
-      end
+        def end_date
+          election.end_at&.to_time
+        end
 
-      def current_date
-        @current_date ||= Time.current.to_time
+        def current_date
+          @current_date ||= Time.current.to_time
+        end
       end
     end
   end
-end
 end
