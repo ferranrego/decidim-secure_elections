@@ -48,6 +48,14 @@ module Decidim
             Decidim::Elections::Election.prepend(
               Decidim::Elections::Vocdoni::PublishLocksEditing
             )
+
+            # Wire the Security tab into the wizard: after "Save and
+            # continue" on Census, upstream would drop the admin on the
+            # Dashboard. The include rewires that redirect so the admin
+            # sees Security before Dashboard, matching the tab order.
+            Decidim::Elections::Admin::CensusController.include(
+              Decidim::Elections::Vocdoni::CensusRedirectsToSecurity
+            )
           end
         end
 
@@ -84,18 +92,18 @@ module Decidim
 
           Decidim.menu :admin_elections_menu do |menu|
             election = @election
-            next if election.blank?
-
-            proxy = Decidim::EngineRouter.admin_proxy(election.component)
+            proxy = election ? Decidim::EngineRouter.admin_proxy(election.component) : nil
             security_path = proxy&.election_security_path(election)
-            # Position 3.5 slots the tab between Census (position 3, upstream
-            # order) and Dashboard (position 4) without depending on either
-            # item's implementation detail — Decidim::Menu sorts by float and
-            # 3.5 sits between them regardless of future upstream additions
-            # at the ends.
+            # Mirror upstream's other tabs on the New Election form: the
+            # item is always rendered so an admin sees the full wizard
+            # shape from the first step, but the link is a `"#"` span
+            # until the election exists (there is nothing to point at
+            # yet). Position 3.5 slots it between Census (3) and
+            # Dashboard (4) regardless of future upstream additions at
+            # either end — Decidim::Menu sorts items by float position.
             menu.add_item :vocdoni_security,
                           I18n.t("security", scope: "decidim.admin.menu.elections_menu"),
-                          security_path,
+                          election.present? ? security_path : "#",
                           active: security_path.present? && is_active_link?(security_path),
                           icon_name: "shield-keyhole-line",
                           position: 3.5
