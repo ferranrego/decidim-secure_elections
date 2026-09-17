@@ -17,9 +17,7 @@ en:
               enable_help_html: >
                 Route this election through the Vocdoni voting protocol so ballots
                 are signed and submitted in the voter's browser and the tally is
-                anchored on the Vocdoni blockchain. Publishing this election will
-                then be irreversible — the process, its questions and its census
-                cannot change after that.
+                anchored on the Vocdoni blockchain.
               enable_label: "Enable Vocdoni secure voting for this election"
               two_fa_heading: "Second-factor authentication"
               two_fa_help_html: >
