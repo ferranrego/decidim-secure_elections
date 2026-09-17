@@ -71,10 +71,17 @@ module Decidim
           # resources on manual+scheduled overlap.
           return if process.publishing?
           # Self-invalidation for scheduled pushes: if the admin rescheduled
-          # start_at after this job was enqueued, the model's after_update_commit
-          # (see ReschedulesPush concern) enqueued a fresh job for the new
-          # timestamp. This stale copy silently no-ops.
-          return if scheduled_start_at.present? && election.start_at != scheduled_start_at.to_datetime
+          # start_at after this job was enqueued, the model's
+          # `after_update_commit` (see the reschedule_push_on_start_at_change
+          # initializer) enqueued a fresh job for the new timestamp. This
+          # stale copy silently no-ops. Compared at second precision — that
+          # is the precision an admin can control from the form, and it
+          # sidesteps a microsecond diff between the model's Time and the
+          # ActiveJob-serialized Time we get back here.
+          if scheduled_start_at.present?
+            expected_at = scheduled_start_at.respond_to?(:to_i) ? scheduled_start_at : Time.zone.parse(scheduled_start_at.to_s)
+            return if election.start_at.nil? || election.start_at.to_i != expected_at.to_i
+          end
 
           Decidim::Elections::Vocdoni.validate_configuration!
 

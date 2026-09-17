@@ -143,12 +143,19 @@ module Decidim
         # the kwargs hash. Not the 5-arg `|name, started, finished, id,
         # payload|` shape that `instrument` uses.
 
-        # Publish is a no-op at the Vocdoni layer for elections opted in to
-        # `vocdoni_secure`. Decidim still lets the admin edit questions,
-        # census source and start mode after publishing, so any push here
-        # would diverge from the state Vochain eventually sees at start.
-        # For scheduled elections this subscriber will grow a
-        # `wait_until: start_at` enqueue (Stage D of the stg3 spike).
+        # For manual-start elections, Publish is a no-op at the Vocdoni
+        # layer — the push happens when the admin clicks Start (see the
+        # `subscribe_to_start` initializer below). For scheduled elections
+        # (`start_at` set to a future timestamp at publish time) the
+        # subscriber schedules the push for exactly `start_at` via
+        # `Sidekiq.set(wait_until:)`. Same job either way — only the
+        # trigger differs.
+        #
+        # The scheduled path mirrors `decidim-blogs/PublishPostJob`, which
+        # is enqueued at post-create with `wait_until: published_at`. The
+        # sidekiq schedule zset holds the job in Redis until fire time and
+        # then dispatches it. See `docs/spike-start-triggered-push.md` for
+        # the reliability considerations.
         initializer "phase_4_spike.subscribe_to_publish" do
           ActiveSupport::Notifications.subscribe("decidim.elections.admin.publish_election:after") do |_event_name, data|
             election = data[:election]
@@ -158,7 +165,15 @@ module Decidim
 
             next unless election.census_manifest.to_s == "vocdoni_secure"
 
-            Rails.logger.info "[phase-4-spike] publish is a no-op for vocdoni_secure election ##{election.id}; push happens at start"
+            if election.start_at.present? && election.start_at.future?
+              scheduled_at = election.start_at
+              Decidim::Elections::Vocdoni::PushElectionJob
+                .set(wait_until: scheduled_at)
+                .perform_later(election.id, scheduled_at)
+              Rails.logger.info "[phase-4-spike] scheduled PushElectionJob for election ##{election.id} at #{scheduled_at.iso8601}"
+            else
+              Rails.logger.info "[phase-4-spike] publish is a no-op for vocdoni_secure election ##{election.id}; push happens when admin clicks Start"
+            end
           end
         end
 
@@ -183,6 +198,38 @@ module Decidim
             if election.census_manifest.to_s == "vocdoni_secure"
               Decidim::Elections::Vocdoni::PushElectionJob.perform_later(election.id)
               Rails.logger.info "[phase-4-spike] enqueued PushElectionJob for election ##{election.id} (manual start)"
+            end
+          end
+        end
+
+        # Re-enqueue the scheduled push when the admin edits `start_at`
+        # after Publish. Uses `after_update_commit` on Decidim's Election
+        # model — this is a runtime class extension, not a source-file
+        # patch, so no upstream file is touched.
+        #
+        # The old scheduled job in the sidekiq schedule zset stays queued
+        # for the old timestamp; when it wakes it self-invalidates because
+        # `election.start_at` no longer matches the `scheduled_start_at`
+        # arg it was enqueued with (see the guard in
+        # `PushElectionJob#perform`). The new job here uses the new
+        # `start_at`.
+        #
+        # Runs at boot (initializer) rather than every reload (to_prepare)
+        # because on z4 `cache_classes` is true — the callback is added
+        # once to the loaded class and stays. Local dev with reloading
+        # loses the callback after a code edit; a full server restart
+        # brings it back.
+        initializer "phase_4_spike.reschedule_push_on_start_at_change" do
+          Decidim::Elections::Election.class_eval do
+            after_update_commit do
+              next unless respond_to?(:saved_change_to_start_at?) && saved_change_to_start_at?
+              next unless census_manifest.to_s == "vocdoni_secure"
+              next unless start_at.present? && start_at.future?
+
+              Decidim::Elections::Vocdoni::PushElectionJob
+                .set(wait_until: start_at)
+                .perform_later(id, start_at)
+              Rails.logger.info "[phase-4-spike] rescheduled PushElectionJob for election ##{id} at #{start_at.iso8601} (start_at changed)"
             end
           end
         end
