@@ -4,10 +4,12 @@ module Decidim
   module Elections
     module Vocdoni
       module Admin
-        # Security tab (vocdoni_secure only). Owns the second-factor choice
-        # — email OTP, SMS OTP, both, or none — that the publish job forwards
-        # verbatim as `twoFaFields` when it creates the process on Vocdoni's
-        # SaaS. Storage is `election.census_settings["twofa_fields"]`.
+        # Security tab. Owns the Vocdoni opt-in for the election (via the
+        # {AdminForms::SecurityForm#enable_vocdoni} checkbox) and the
+        # second-factor challenge — email OTP, SMS OTP, both, or none — that
+        # the publish job forwards verbatim as `twoFaFields` when it creates
+        # the process on Vocdoni's SaaS. Storage is the sidecar
+        # {Vocdoni::Process}; its presence is the opt-in signal.
         #
         # Inherits from upstream's `Decidim::Elections::Admin::ApplicationController`
         # rather than the Vocdoni admin base, because in the phase-4 spike
