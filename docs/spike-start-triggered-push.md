@@ -155,10 +155,12 @@ Sidekiq persists everything in Redis:
 - Failed jobs live in the `retry` zset, then dead set after 25 attempts.
 
 The scheduled push job may sit in `schedule` for days on a scheduled
-election. Its survival depends on Redis persistence (AOF or RDB) — **verify
-on z4 that Redis is configured with appendonly or snapshots before running
-stg3 with scheduled elections**. Without persistence, a Redis restart wipes
-the schedule; with AOF, at most one fsync interval is lost.
+election. Its survival depends on Redis persistence (AOF or RDB). On z4
+(checked 2026-09-17): `appendonly no`, `save 3600 1 300 100 60 10000` —
+RDB snapshots only, up to one hour of loss for a quiet Redis but in
+practice Sidekiq's heartbeat keeps writes flowing so the 60s / 300s
+triggers dominate. Acceptable for a throwaway demo deploy; not the
+setting you'd pick for prod.
 
 Blackout window if Sidekiq is down at `start_at`:
 
