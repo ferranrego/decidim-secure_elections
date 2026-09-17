@@ -56,6 +56,16 @@ module Decidim
             Decidim::Elections::Admin::CensusController.include(
               Decidim::Elections::Vocdoni::CensusRedirectsToSecurity
             )
+
+            # Voter-side: whichever action of the votes controller the
+            # voter lands on, hand them off to the Vocdoni booth SPA when
+            # the election opted in. Otherwise the upstream per-question
+            # wizard renders — for Vocdoni elections that would let a
+            # voter drive Decidim's own ballot without ever touching the
+            # SaaS, which is not the intent.
+            Decidim::Elections::VotesController.include(
+              Decidim::Elections::Vocdoni::RedirectsVoterToBooth
+            )
           end
         end
 
