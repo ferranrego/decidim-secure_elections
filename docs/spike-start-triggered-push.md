@@ -187,16 +187,17 @@ Phase-4). Cloned from stg2's recipe.
 | Sidekiq Redis db | 0 | 5 | **7** |
 | Cache Redis db | 4 | 6 | **8** |
 | DB | `decidim_stg_app_dev` | `decidim_stg2_app_dev` | **`decidim_stg3_app_dev`** |
-| Sidekiq queue | `vocdoni_spike` | `vocdoni_spike` | **`vocdoni_spike_stg3`** |
+| Sidekiq queue | `vocdoni_spike` | `vocdoni_spike` | `vocdoni_spike` (same; isolated via Redis db) |
 | Tree | `~/decidim/stg/` | `~/decidim/stg2/` | **`~/decidim/stg3/`** |
 | Monorepo symlink | — | `→ ../stg/decidim` | **`→ ../stg/decidim`** |
 | Tunnel log | `/tmp/cftunnel-stg.log` | `/tmp/cftunnel-stg2.log` | **`/tmp/cftunnel-stg3.log`** |
 | Branch | `spike/phase-4-registration` | `spike/phase-4-registration` | **`spike/integration-into-elections_v3`** |
 
-Queue name is intentionally distinct from stg/stg2 (which both use
-`vocdoni_spike` and isolate via Redis dbs) — with Redis isolation the queue
-name would be enough, but a distinct name prevents operational confusion
-when three deploys share a host.
+Queue name matches stg/stg2 (`vocdoni_spike`). Isolation is via Redis dbs
+7/8, which is sufficient — jobs enqueued by stg3's Rails go into db 7,
+picked up only by stg3's sidekiq (which also connects to db 7). Prod's
+sidekiq listens on the `vocdoni` queue in Redis db 0, so there is no
+cross-listen path.
 
 Bootstrap follows the stg2 recipe verbatim with the deltas above.
 

@@ -51,7 +51,7 @@ module Decidim
 
             return if process.published?
 
-            Decidim::Elections::Vocdoni::PublishToVocdoniJob.preview_census!(election.id)
+            Decidim::Elections::Vocdoni::PushElectionJob.preview_census!(election.id)
           end
         end
       end

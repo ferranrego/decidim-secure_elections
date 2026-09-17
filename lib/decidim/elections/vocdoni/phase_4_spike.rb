@@ -137,7 +137,7 @@ module Decidim
           end
         end
 
-        # Enqueues {PublishToVocdoniJob} whenever a Vocdoni-backed election is
+        # Enqueues {PushElectionJob} whenever a Vocdoni-backed election is
         # published from the Decidim admin. The subscription piggybacks on the
         # `decidim.elections.admin.publish_election:after` notification added
         # by vocdoni/decidim#2 (see phase-4/integration).
@@ -156,8 +156,8 @@ module Decidim
             Rails.logger.info "[phase-4-spike] publish_election:after fired for election ##{election.id} (manifest=#{election.census_manifest.inspect})"
 
             if election.census_manifest.to_s == "vocdoni_secure"
-              Decidim::Elections::Vocdoni::PublishToVocdoniJob.perform_later(election.id)
-              Rails.logger.info "[phase-4-spike] enqueued PublishToVocdoniJob for election ##{election.id}"
+              Decidim::Elections::Vocdoni::PushElectionJob.perform_later(election.id)
+              Rails.logger.info "[phase-4-spike] enqueued PushElectionJob for election ##{election.id}"
             end
           end
         end

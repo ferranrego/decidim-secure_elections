@@ -30,7 +30,7 @@ module Decidim
       # standalone module: same steps, same retry-safety rules, but the state
       # it reads and writes is the upstream Election plus the sidecar Process,
       # not a Vocdoni-owned Election model.
-      class PublishToVocdoniJob < ApplicationJob
+      class PushElectionJob < ApplicationJob
         # A stg-only queue so the "main" Sidekiq (which runs the legacy
         # `PublishElectionJob` on the `:vocdoni` queue for
         # decidim.vocdoni.io) never picks up a stg-spike job it does not

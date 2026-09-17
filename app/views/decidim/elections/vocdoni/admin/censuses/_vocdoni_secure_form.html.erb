@@ -8,7 +8,7 @@
       payload). Second-factor OTP selection is on its own Security tab and
       is written to `census_settings["twofa_fields"]` from there.
    2. The census pre-flight result — populated by `AfterUpdateCensus`, which
-      runs `PublishToVocdoniJob.preview_census!` on save. `ok:true` unblocks
+      runs `PushElectionJob.preview_census!` on save. `ok:true` unblocks
       the Publish button on the Dashboard; anything else keeps it disabled
       until the admin re-picks a combination the roster can satisfy.
 %>

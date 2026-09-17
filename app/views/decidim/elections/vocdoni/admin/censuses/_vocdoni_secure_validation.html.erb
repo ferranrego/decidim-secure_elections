@@ -1,8 +1,8 @@
 <%#
   Renders the outcome of the last census pre-flight against Vocdoni's SaaS.
 
-  Populated by PublishToVocdoniJob.preview_census! via AfterUpdateCensus,
-  and by the full PublishToVocdoniJob when a real publish fails at the
+  Populated by PushElectionJob.preview_census! via AfterUpdateCensus,
+  and by the full PushElectionJob when a real publish fails at the
   same step. Two shapes:
 
     ok:true  → members push + group create + validate all passed.

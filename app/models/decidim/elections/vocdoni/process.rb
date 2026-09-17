@@ -49,7 +49,7 @@ module Decidim
         def failed?     = state == "failed"
 
         # Per-question upstream ids and chain-side statuses. Written by
-        # PublishToVocdoniJob after the process is on chain; read by the voter
+        # PushElectionJob after the process is on chain; read by the voter
         # booth and the results-sync job.
         #
         # Shape:
@@ -124,7 +124,7 @@ module Decidim
         end
 
         # The last census pre-flight — populated by `AfterUpdateCensus` (which
-        # runs `PublishToVocdoniJob.preview_census!` on every save of the
+        # runs `PushElectionJob.preview_census!` on every save of the
         # Census tab) and read by the Dashboard to gate the Publish button.
         # `ok: true` means the current auth-field selection produces unique,
         # complete credentials over the current roster. Any other value —

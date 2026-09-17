@@ -45,7 +45,7 @@ module Decidim
             # call would still hit the memberbase for no reason.
             return process if process.published?
 
-            Decidim::Elections::Vocdoni::PublishToVocdoniJob.preview_census!(election.id)
+            Decidim::Elections::Vocdoni::PushElectionJob.preview_census!(election.id)
             process.reload
           end
         end

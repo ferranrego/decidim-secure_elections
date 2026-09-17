@@ -7,7 +7,7 @@ module Decidim
       # and mirrors it into the {Process} sidecar so the admin dashboard and
       # the voter booth do not each have to call the API.
       #
-      # Enqueued from {PublishToVocdoniJob} right after `POST /processes` and
+      # Enqueued from {PushElectionJob} right after `POST /processes` and
       # again from itself while the process is still `publishing`, so a
       # deferred SaaS confirmation (the "publish did not confirm all questions
       # after 3 rounds" case) resolves without a human refreshing anything.
