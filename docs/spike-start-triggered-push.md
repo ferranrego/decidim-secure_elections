@@ -74,11 +74,13 @@ If the admin changes `start_at` after Publish, the old job in the schedule
 zset is stale. Handled analogously to `PublishPostJob`:
 
 ```ruby
-def perform(election_id, scheduled_start_at)
-  election = Decidim::Elections::Election.find(election_id)
-  return unless election.start_at == scheduled_start_at
-  return if sidecar_marked_started?(election)
+def perform(election_id, scheduled_start_at = nil)
+  return unless bootstrap!(election_id)
+  return if process.publishing? || process.published?
+  return if scheduled_start_at.present? && election.start_at != scheduled_start_at.to_datetime
+  process.update!(state: "publishing")
   push_to_vochain(election)
+  process.update!(state: "published")
 end
 ```
 
@@ -136,8 +138,11 @@ New files:
 - `app/models/concerns/decidim/secure_elections/vocdoni/reschedules_push.rb`
   — `after_update_commit` on Election that re-enqueues `PushElectionJob` when
   `start_at` changes.
-- `db/migrate/*_add_vochain_started_at_to_secure_election_sidecars.rb` —
-  the marker used for idempotency + subscriber/job coordination.
+- No new migration — the existing `state` column on the sidecar Process
+  (`pending` / `publishing` / `published` / `failed`) already carries the
+  signal needed for manual/scheduled coordination. The idempotency guard
+  in `PushElectionJob#perform` is tightened to also short-circuit on
+  `state == "publishing"`, not only on `published_upstream?`.
 
 Removed / reduced:
 

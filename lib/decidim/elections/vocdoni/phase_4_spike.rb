@@ -137,17 +137,18 @@ module Decidim
           end
         end
 
-        # Enqueues {PushElectionJob} whenever a Vocdoni-backed election is
-        # published from the Decidim admin. The subscription piggybacks on the
-        # `decidim.elections.admin.publish_election:after` notification added
-        # by vocdoni/decidim#2 (see phase-4/integration).
-        #
-        # `Decidim::Command#with_events` publishes via
-        # `ActiveSupport::Notifications.publish(name, **event_arguments)`,
-        # not `.instrument`. Subscribers therefore receive a 2-arg block —
-        # `|event_name, data|` — where `data` is the kwargs hash, not the
-        # standard 5-arg `|name, started, finished, id, payload|` shape that
-        # `instrument` uses.
+        # Both subscribers speak the `Decidim::Command#with_events` shape:
+        # `ActiveSupport::Notifications.publish(name, **event_arguments)`
+        # delivers a 2-arg block — `|event_name, data|` — where `data` is
+        # the kwargs hash. Not the 5-arg `|name, started, finished, id,
+        # payload|` shape that `instrument` uses.
+
+        # Publish is a no-op at the Vocdoni layer for elections opted in to
+        # `vocdoni_secure`. Decidim still lets the admin edit questions,
+        # census source and start mode after publishing, so any push here
+        # would diverge from the state Vochain eventually sees at start.
+        # For scheduled elections this subscriber will grow a
+        # `wait_until: start_at` enqueue (Stage D of the stg3 spike).
         initializer "phase_4_spike.subscribe_to_publish" do
           ActiveSupport::Notifications.subscribe("decidim.elections.admin.publish_election:after") do |_event_name, data|
             election = data[:election]
@@ -155,9 +156,33 @@ module Decidim
 
             Rails.logger.info "[phase-4-spike] publish_election:after fired for election ##{election.id} (manifest=#{election.census_manifest.inspect})"
 
+            next unless election.census_manifest.to_s == "vocdoni_secure"
+
+            Rails.logger.info "[phase-4-spike] publish is a no-op for vocdoni_secure election ##{election.id}; push happens at start"
+          end
+        end
+
+        # Push happens when the election transitions into `started` —
+        # either via the admin's manual Start click, or (Stage D) when a
+        # scheduled `start_at` fires. Piggybacks on the notification added
+        # by vocdoni/decidim#3 (`UpdateElectionStatus with_events`).
+        #
+        # The command handles :start, :end and :publish_results with a
+        # single notification name; the subscriber filters on `action ==
+        # :start` so ending an election or publishing its results does
+        # not re-trigger the push.
+        initializer "phase_4_spike.subscribe_to_start" do
+          ActiveSupport::Notifications.subscribe("decidim.elections.admin.update_election_status:after") do |_event_name, data|
+            election = data[:election]
+            action   = data[:action]
+            next if election.blank?
+            next unless action == :start
+
+            Rails.logger.info "[phase-4-spike] update_election_status:after fired for election ##{election.id} action=:start (manifest=#{election.census_manifest.inspect})"
+
             if election.census_manifest.to_s == "vocdoni_secure"
               Decidim::Elections::Vocdoni::PushElectionJob.perform_later(election.id)
-              Rails.logger.info "[phase-4-spike] enqueued PushElectionJob for election ##{election.id}"
+              Rails.logger.info "[phase-4-spike] enqueued PushElectionJob for election ##{election.id} (manual start)"
             end
           end
         end

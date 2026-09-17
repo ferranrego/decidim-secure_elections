@@ -63,9 +63,18 @@ module Decidim
           "name"          => "name"
         }.freeze
 
-        def perform(election_id)
+        def perform(election_id, scheduled_start_at = nil)
           return unless bootstrap!(election_id)
           return if published_upstream?
+          # Someone else — the manual-start subscriber or a previous run —
+          # is already pushing this election. Skipping avoids duplicate SaaS
+          # resources on manual+scheduled overlap.
+          return if process.publishing?
+          # Self-invalidation for scheduled pushes: if the admin rescheduled
+          # start_at after this job was enqueued, the model's after_update_commit
+          # (see ReschedulesPush concern) enqueued a fresh job for the new
+          # timestamp. This stale copy silently no-ops.
+          return if scheduled_start_at.present? && election.start_at != scheduled_start_at.to_datetime
 
           Decidim::Elections::Vocdoni.validate_configuration!
 
