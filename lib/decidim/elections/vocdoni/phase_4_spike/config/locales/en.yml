@@ -31,7 +31,6 @@ en:
               email_label: "Email one-time code"
               email_help: "Requires every voter to have an email address on their memberbase entry."
               both_note: "If both are checked, the voter picks which one to receive at authentication time."
-              save: "Save"
             update:
               success: "Security settings updated."
               invalid: "Security settings could not be saved. Please review the errors below."

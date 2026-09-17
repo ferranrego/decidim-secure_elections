@@ -54,7 +54,11 @@
 
       <div class="item__edit-sticky">
         <div class="item__edit-sticky-container">
-          <%= f.submit t(".save"), class: "button button__sm button__secondary" %>
+          <%# Reuse upstream's translation so the label reads the same as
+              on Questions and Census ("Save and continue"), and picks up
+              future locale updates without a fork. %>
+          <%= f.submit t("save", scope: "decidim.elections.admin.elections.form"),
+                       class: "button button__sm button__secondary" %>
         </div>
       </div>
     <% end %>
