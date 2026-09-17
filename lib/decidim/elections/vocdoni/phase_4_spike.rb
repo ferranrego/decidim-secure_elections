@@ -88,11 +88,17 @@ module Decidim
 
             proxy = Decidim::EngineRouter.admin_proxy(election.component)
             security_path = proxy&.election_security_path(election)
+            # Position 3.5 slots the tab between Census (position 3, upstream
+            # order) and Dashboard (position 4) without depending on either
+            # item's implementation detail — Decidim::Menu sorts by float and
+            # 3.5 sits between them regardless of future upstream additions
+            # at the ends.
             menu.add_item :vocdoni_security,
                           I18n.t("security", scope: "decidim.admin.menu.elections_menu"),
                           security_path,
                           active: security_path.present? && is_active_link?(security_path),
-                          icon_name: "shield-keyhole-line"
+                          icon_name: "shield-keyhole-line",
+                          position: 3.5
           end
         end
 
