@@ -3,9 +3,8 @@
 
   Only meaningful for a secret vote, so the whole fieldset is `disabled`
   while the simple vote is selected; `security.js` flips it as the admin
-  changes the vote type. The Vocdoni roster is made of registered
-  participants, who all have an email address, so the email code needs no
-  further condition. SMS is shown so admins know it exists, never enabled.
+  changes the vote type. Email and SMS are independent; with both on, the
+  voter picks the channel when the code is requested.
 %>
 <% scope = "decidim.elections.vocdoni.admin.security.show.two_factor" %>
 <% enabled = @form.enable_vocdoni %>
@@ -35,7 +34,7 @@
                               label: false,
                               id: "security_email",
                               aria: { describedby: "security-email-help" },
-                              data: { security_email: true } %>
+                              data: { security_code: true } %>
               <label for="security_email" class="vocdoni-two-factor__label">
                 <%= icon "mail-lock-line" %>
                 <span><%= t("email.label", scope:) %></span>
@@ -44,22 +43,23 @@
             <p class="help-text vocdoni-two-factor__help" id="security-email-help"><%= t("email.help", scope:) %></p>
           </div>
 
-          <div class="vocdoni-two-factor__option is-unavailable">
+          <div class="vocdoni-two-factor__option">
             <div class="vocdoni-two-factor__control">
               <%= f.check_box :sms,
                               label: false,
                               id: "security_sms",
-                              disabled: true,
-                              aria: { describedby: "security-sms-help" } %>
+                              aria: { describedby: "security-sms-help" },
+                              data: { security_code: true } %>
               <label for="security_sms" class="vocdoni-two-factor__label">
                 <%= icon "smartphone-line" %>
                 <span><%= t("sms.label", scope:) %></span>
               </label>
-              <span class="label reverse vocdoni-two-factor__pill"><%= t("sms.coming_soon", scope:) %></span>
             </div>
             <p class="help-text vocdoni-two-factor__help" id="security-sms-help"><%= t("sms.help", scope:) %></p>
           </div>
         </div>
+
+        <p class="help-text vocdoni-two-factor__both"><%= t("both_note", scope:) %></p>
       </fieldset>
     </div>
   </div>

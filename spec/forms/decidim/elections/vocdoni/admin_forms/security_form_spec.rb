@@ -21,17 +21,17 @@ module Decidim
               end
             end
 
-            context "when the election opted in with the email code" do
+            context "when the election opted in with both codes" do
               before do
                 Vocdoni::Process.create!(election:, state: "pending",
-                                         metadata: { "settings" => { "twofa_fields" => %w(email) } })
+                                         metadata: { "settings" => { "twofa_fields" => %w(email phone) } })
               end
 
-              it "shows a secret vote with the email code" do
+              it "shows a secret vote with both codes" do
                 expect(form.enable_vocdoni).to be(true)
                 expect(form.choice).to eq("secure")
                 expect(form.email).to be(true)
-                expect(form.sms).to be(false)
+                expect(form.sms).to be(true)
                 expect(form.level).to eq("strongest")
               end
             end
@@ -70,12 +70,20 @@ module Decidim
               end
             end
 
-            context "when the SMS box is not sent because the page disables it" do
-              let(:params) { { enable_vocdoni: "true", email: "0" } }
+            context "when only the SMS code is chosen" do
+              let(:params) { { enable_vocdoni: "true", email: "0", sms: "1" } }
 
-              it "leaves SMS off" do
-                expect(form.sms).to be(false)
-                expect(form.two_fa_fields).to eq([])
+              it "sends the phone code" do
+                expect(form.two_fa_fields).to eq(%w(phone))
+                expect(form.level).to eq("strongest")
+              end
+            end
+
+            context "when both codes are chosen" do
+              let(:params) { { enable_vocdoni: "true", email: "1", sms: "1" } }
+
+              it "lets the voter pick" do
+                expect(form.two_fa_fields).to eq(%w(email phone))
               end
             end
           end

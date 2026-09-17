@@ -57,7 +57,7 @@ module Decidim
           def level
             return "basic" unless enable_vocdoni
 
-            two_fa_fields.include?("email") ? "strongest" : "strong"
+            two_fa_fields.any? ? "strongest" : "strong"
           end
 
           # SaaS-shape array — the same value we forward verbatim as

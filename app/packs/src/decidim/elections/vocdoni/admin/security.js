@@ -22,14 +22,14 @@ const SUMMARY_ID = "js-security-summary";
 /**
  * Mirrors `SecurityForm#level`.
  * @param {string} choice "simple" or "secure".
- * @param {boolean} emailCode whether the email code will be sent.
+ * @param {boolean} oneTimeCode whether a one-time code (email or SMS) will be sent.
  * @returns {string} "basic", "strong" or "strongest".
  */
-const securityLevel = (choice, emailCode) => {
+const securityLevel = (choice, oneTimeCode) => {
   if (choice !== "secure") {
     return "basic";
   }
-  return emailCode
+  return oneTimeCode
     ? "strongest"
     : "strong";
 };
@@ -45,7 +45,7 @@ const setupSecurity = () => {
 
   const radios = Array.from(choice.querySelectorAll("[data-security-choice]"));
   const cards = Array.from(choice.querySelectorAll("[data-security-choice-card]"));
-  const email = twoFactor.querySelector("[data-security-email]");
+  const codes = Array.from(twoFactor.querySelectorAll("[data-security-code]"));
   const notes = Array.from(twoFactor.querySelectorAll("[data-two-factor-note]"));
 
   const selected = () => {
@@ -68,7 +68,7 @@ const setupSecurity = () => {
       element.hidden = usable;
     });
 
-    return usable && Boolean(email && email.checked);
+    return usable && codes.some((box) => box.checked);
   };
 
   const syncSummary = (level) => {
@@ -105,9 +105,7 @@ const setupSecurity = () => {
   });
 
   radios.forEach((radio) => radio.addEventListener("change", sync));
-  if (email) {
-    email.addEventListener("change", sync);
-  }
+  codes.forEach((box) => box.addEventListener("change", sync));
 
   // Form state survives a back-navigation, so start in step with it.
   sync();

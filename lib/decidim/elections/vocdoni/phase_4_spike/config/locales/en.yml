@@ -46,7 +46,7 @@ en:
                   # rendered when this has a value.
                   guide_url: ""
                   guide_link: "Read the full guide"
-                good_to_know_html: "<strong>Good to know:</strong> you can change this choice until the election is published. Voters won't notice any difference, except the email code if you enable it."
+                good_to_know_html: "<strong>Good to know:</strong> you can change this choice until the election is published. Voters won't notice any difference, except the one-time code if you enable it."
               why:
                 title: "Why it matters for organisations and public bodies"
                 secrecy:
@@ -95,18 +95,18 @@ en:
                   help: "The code goes to the email address each participant registered with."
                 sms:
                   label: "SMS code"
-                  help: "Sends the code by text message. Not available in this version."
-                  coming_soon: "Coming soon"
+                  help: "The code goes by text message, so every voter needs a phone number registered with the voting service."
+                both_note: "If both are on, each voter chooses how to receive the code."
               summary:
                 title: "Your configuration"
                 levels:
                   basic: "Simple"
                   strong: "Secret & verifiable"
-                  strongest: "Secret, verifiable + email code"
+                  strongest: "Secret, verifiable + one-time code"
                 sentences:
                   basic: "Ballots are kept on this platform. Suitable for informal consultations."
                   strong: "Anonymous ballots, result checkable by anyone."
-                  strongest: "Anonymous ballots, result checkable by anyone. Voters confirm their identity with a code sent by email."
+                  strongest: "Anonymous ballots, result checkable by anyone. Voters confirm their identity with a one-time code."
             update:
               success: "Security settings updated."
               invalid: "Security settings could not be saved. Please review the errors below."

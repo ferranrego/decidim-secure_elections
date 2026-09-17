@@ -257,18 +257,6 @@
 
   .vocdoni-two-factor__option {
     @apply p-4 rounded-lg border border-background-4 bg-white;
-
-    &.is-unavailable {
-      @apply bg-background;
-
-      .vocdoni-two-factor__label {
-        @apply text-gray-2 cursor-not-allowed;
-
-        svg {
-          @apply fill-gray-2;
-        }
-      }
-    }
   }
 
   .vocdoni-two-factor__control {
@@ -287,8 +275,8 @@
     }
   }
 
-  .vocdoni-two-factor__pill {
-    @apply ml-auto;
+  .vocdoni-two-factor__both {
+    @apply mt-3 mb-0;
   }
 
   .vocdoni-two-factor__help {
